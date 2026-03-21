@@ -2,232 +2,539 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>收藏分类管理器 - 设置</title>
+<title>Jable 收藏管理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --bg-primary: #0a0a0c;
+    --bg-secondary: #141418;
+    --bg-card: #1a1a1f;
+    --bg-hover: #222228;
+    --accent: #e8a84c;
+    --accent-dim: #b8843a;
+    --accent-glow: rgba(232, 168, 76, 0.15);
+    --text-primary: #f0ece4;
+    --text-secondary: #8a8690;
+    --text-dim: #5a5660;
+    --border: #2a2a30;
+    --danger: #d9534f;
+    --success: #5cb85c;
+    --font-display: 'Sora', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-    background: #f5f5f5;
+    font-family: var(--font-display);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
   }
-  
+
+  /* Film grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.03;
+    z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+
   .container {
-    background: white;
-    border-radius: 8px;
-    padding: 30px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 24px;
   }
-  
+
+  /* Header */
   .header {
     text-align: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #eee;
+    margin-bottom: 48px;
+    position: relative;
   }
-  
-  .section {
-    margin-bottom: 30px;
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
   }
-  
-  .section h3 {
-    color: #333;
-    margin-bottom: 15px;
-    font-size: 18px;
+
+  .header h1 {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: 32px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--text-primary);
   }
-  
-  .form-group {
-    margin-bottom: 20px;
+
+  .header h1 span {
+    color: var(--accent);
+    font-weight: 600;
   }
-  
-  .form-group label {
+
+  .header p {
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* Stats Bar */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    padding: 24px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
     display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: #555;
   }
-  
-  .form-group input, .form-group select, .form-group textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
   }
-  
-  .form-group textarea {
-    height: 100px;
-    resize: vertical;
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
   }
-  
-  .checkbox-group {
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .toolbar-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  select, input {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  select:hover, input:hover {
+    border-color: var(--accent-dim);
+  }
+
+  select:focus, input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  input[type="text"] {
+    min-width: 280px;
+  }
+
+  .page-controls {
     display: flex;
     align-items: center;
     gap: 8px;
   }
-  
-  .checkbox-group input[type="checkbox"] {
-    width: auto;
-  }
-  
-  .btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-right: 10px;
-    margin-bottom: 10px;
-  }
-  
-  .btn-primary {
-    background: #007bff;
-    color: white;
-  }
-  
-  .btn-success {
-    background: #28a745;
-    color: white;
-  }
-  
-  .btn-danger {
-    background: #dc3545;
-    color: white;
-  }
-  
-  .btn-secondary {
-    background: #6c757d;
-    color: white;
-  }
-  
-  .status-message {
-    padding: 10px;
-    border-radius: 4px;
-    margin-top: 10px;
-    display: none;
-  }
-  
-  .status-success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-  }
-  
-  .status-error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-  }
-  
-  .data-preview {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    padding: 15px;
-    font-family: monospace;
+
+  .page-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    border-radius: 6px;
     font-size: 12px;
-    max-height: 200px;
-    overflow-y: auto;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .page-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--accent-dim);
+  }
+
+  .page-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .page-info {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 0 12px;
+  }
+
+  /* Video Grid */
+  .video-list {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .video-item {
+    display: grid;
+    grid-template-columns: 120px 1fr auto;
+    gap: 20px;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s ease;
+  }
+
+  .video-item:last-child {
+    border-bottom: none;
+  }
+
+  .video-item:hover {
+    background: var(--bg-hover);
+  }
+
+  .video-thumb {
+    position: relative;
+    aspect-ratio: 16/9;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+
+  .video-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .video-thumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+
+  .video-info {
+    min-width: 0;
+  }
+
+  .video-id {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .video-title {
+    font-size: 14px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 6px;
+  }
+
+  .video-time {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .video-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover {
+    background: var(--danger);
+    color: white;
+  }
+
+  /* Empty State */
+  .empty-state {
+    padding: 80px 40px;
+    text-align: center;
+  }
+
+  .empty-state-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 24px;
+    opacity: 0.3;
+  }
+
+  .empty-state h3 {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    gap: 16px;
+  }
+
+  /* Data Actions */
+  .data-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .btn-secondary {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    color: var(--bg-primary);
+  }
+
+  .btn-accent:hover {
+    background: var(--accent-dim);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    padding: 14px 28px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .toast.success {
+    background: var(--success);
+    color: white;
+  }
+
+  .toast.error {
+    background: var(--danger);
+    color: white;
+  }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    gap: 16px;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .loading p {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .toolbar-group {
+      justify-content: space-between;
+    }
+
+    input[type="text"] {
+      min-width: 100%;
+    }
+
+    .video-item {
+      grid-template-columns: 80px 1fr;
+    }
+
+    .video-actions {
+      grid-column: 1 / -1;
+      justify-content: flex-end;
+    }
+
+    .stats-bar {
+      gap: 24px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+    }
   }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="header">
-    <h1>收藏分类管理器 - 设置</h1>
-    <p>配置插件的各项功能和参数</p>
-  </div>
-  
-  <div class="section">
-    <h3>基本设置</h3>
-    <div class="form-group">
-      <div class="checkbox-group">
-        <input type="checkbox" id="auto-sync" checked>
-        <label for="auto-sync">自动同步收藏数据</label>
-      </div>
-    </div>
-    
-    <div class="form-group">
-      <div class="checkbox-group">
-        <input type="checkbox" id="show-panel" checked>
-        <label for="show-panel">显示分类管理面板</label>
-      </div>
-    </div>
-    
-    <div class="form-group">
-      <label for="sync-interval">同步间隔（秒）</label>
-      <input type="number" id="sync-interval" value="30" min="10" max="300">
-    </div>
-  </div>
-  
-  <div class="section">
-    <h3>界面设置</h3>
-    <div class="form-group">
-      <label for="panel-position">面板位置</label>
-      <select id="panel-position">
-        <option value="left">左侧</option>
-        <option value="right" selected>右侧</option>
-        <option value="top">顶部</option>
-        <option value="bottom">底部</option>
-      </select>
-    </div>
-    
-    <div class="form-group">
-      <label for="theme">主题</label>
-      <select id="theme">
-        <option value="light" selected>浅色</option>
-        <option value="dark">深色</option>
-        <option value="auto">跟随系统</option>
-      </select>
-    </div>
-  </div>
-  
-  <div class="section">
-    <h3>数据管理</h3>
-    <div class="form-group">
-      <button class="btn btn-primary" id="export-data">导出所有数据</button>
-      <button class="btn btn-secondary" id="import-data">导入数据</button>
-      <button class="btn btn-danger" id="clear-data">清空所有数据</button>
-    </div>
-    
-    <div class="form-group">
-      <label for="import-file">选择导入文件</label>
-      <input type="file" id="import-file" accept=".json">
-    </div>
-    
-    <div class="form-group">
-      <label>当前数据预览</label>
-      <div class="data-preview" id="data-preview">
-        加载中...
-      </div>
-    </div>
-  </div>
-  
-  <div class="section">
-    <h3>高级设置</h3>
-    <div class="form-group">
-      <label for="custom-selectors">自定义选择器（用于识别收藏项）</label>
-      <textarea id="custom-selectors" placeholder="输入CSS选择器，每行一个">.video-item
-.thumb-item
-[class*="video"]</textarea>
-    </div>
-    
-    <div class="form-group">
-      <div class="checkbox-group">
-        <input type="checkbox" id="debug-mode">
-        <label for="debug-mode">调试模式（控制台输出详细日志）</label>
-      </div>
-    </div>
-  </div>
-  
-  <div class="form-group">
-    <button class="btn btn-success" id="save-settings">保存设置</button>
-    <button class="btn btn-secondary" id="reset-settings">重置为默认</button>
-  </div>
-  
-  <div class="status-message" id="status-message"></div>
-</div>
+  <div class="container">
+    <header class="header">
+      <h1>Jable <span>Collection</span></h1>
+      <p>视频收藏管理</p>
+    </header>
 
-<script src="options.js"></script>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-value" id="total-count">-</span>
+        <span class="stat-label">总收藏</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="display-count">-</span>
+        <span class="stat-label">当前显示</span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <span class="toolbar-label">排序</span>
+        <select id="sort-select">
+          <option value="addedTime-desc">最新添加</option>
+          <option value="addedTime-asc">最早添加</option>
+          <option value="videoId-asc">番号 A→Z</option>
+          <option value="videoId-desc">番号 Z→A</option>
+        </select>
+      </div>
+
+      <div class="toolbar-group">
+        <input type="text" id="search-input" placeholder="搜索番号或标题...">
+      </div>
+
+      <div class="toolbar-group page-controls">
+        <button class="page-btn" id="prev-btn">‹</button>
+        <span class="page-info" id="page-info">1 / 1</span>
+        <button class="page-btn" id="next-btn">›</button>
+        <select id="page-size">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="video-list" id="video-list">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+      </div>
+    </div>
+
+    <div class="data-actions">
+      <button class="btn btn-secondary" id="export-data">导出</button>
+      <button class="btn btn-secondary" id="import-data">导入</button>
+      <button class="btn btn-danger" id="clear-data">清空</button>
+      <input type="file" id="import-file" accept=".json" style="display:none">
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="options.js"></script>
 </body>
 </html>

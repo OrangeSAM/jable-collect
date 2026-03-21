@@ -4,12 +4,10 @@ function getTotalPage() {
   const allPageLinks = document.querySelectorAll('a.page-link[data-parameters*="from_my_fav_videos"]');
   const lastPageLink = Array.from(allPageLinks).find(link => link.textContent.includes('最後'));
 
-
   if (lastPageLink) {
     const dataParameters = lastPageLink.getAttribute('data-parameters');
-    console.log('data-parameters:', dataParameters); // "fav_type:0;playlist_id:0;sort_by:;from_my_fav_videos:144"
+    console.log('data-parameters:', dataParameters);
 
-    // 提取144
     let match = dataParameters.match(/from_my_fav_videos:(\d+)/);
     if (match) {
       totalPage = parseInt(match[1]);
@@ -18,9 +16,8 @@ function getTotalPage() {
   }
 }
 
-
 // jable 影片收藏
-let favVideoData = [] // 影片收藏数据
+let favVideoData = [];
 function getJableFavVideo(page) {
   return fetch("https://jable.tv/my/favourites/videos/?mode=async&function=get_block&block_id=list_videos_my_favourite_videos&fav_type=0&playlist_id=0&sort_by=&from_my_fav_videos=" + page + "&_=" + Date.now(), {
     "headers": {
@@ -53,7 +50,7 @@ function getJableFavVideo(page) {
       return response.text();
     })
     .then(html => {
-      const data = parseJabDomData(html);
+      const data = parseJableDomData(html);
       favVideoData.push(...data);
       console.log(`第${page}页收藏数据获取完成，共${data.length}条`);
     })
@@ -63,7 +60,7 @@ function getJableFavVideo(page) {
 }
 
 // jable 稍后观看
-let laterData = [] // 稍后观看数据
+let laterData = [];
 function getJableWatchLater(page) {
   return fetch("https://jable.tv/my/favourites/videos-watch-later/?mode=async&function=get_block&block_id=list_videos_my_favourite_videos&fav_type=1&playlist_id=0&sort_by=&from_my_fav_videos=26&page=" + page + "&_=" + Date.now(), {
     "headers": {
@@ -87,9 +84,7 @@ function getJableWatchLater(page) {
     });
 }
 
-
-// 实现一个函数，获取dom结构中的数据信息，其中video-img-box 可能会渲染多个，
-// 需要获取的数据包括：img src data-src,detail title, a href
+// 解析 DOM 数据
 function parseJableDomData(html) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
@@ -98,40 +93,62 @@ function parseJableDomData(html) {
   videoImgBoxes.forEach(box => {
     const img = box.querySelector('img');
     const detail = box.querySelector('.detail');
-    data.push({
+    const video = {
       imgSrc: img.src,
       imgDataSrc: img.dataset.src,
       preview: img.dataset.preview,
       detailTitle: detail.querySelector('.title').textContent,
       detailHref: detail.querySelector('.title a').href,
+      url: detail.querySelector('.title a').href,
       from: 'jable'
-    });
+    };
+    video.videoId = extractVideoId(video.detailHref);
+    data.push(video);
   });
   return data;
+}
+
+// 从 URL 提取番号
+function extractVideoId(url) {
+  const match = url.match(/\/videos\/([^\/]+)\/?$/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+// ========== 与 background.js 通信 ==========
+
+// 发送消息到 background.js
+function sendToBackground(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ action, ...data }, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
+// 保存视频到 IndexedDB（通过 background.js）
+async function saveVideosToDB(videos) {
+  const response = await sendToBackground('syncFavorites', { videos });
+  if (!response.success) {
+    throw new Error(response.error);
+  }
+  return response.count;
 }
 
 // 开始执行
 console.log('已初始化收藏插件');
 getTotalPage();
 console.log(`总共有${totalPage}页收藏数据`);
-// // 稍后观看数据分页获取
-// (async () => {
-//   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-//   for (let i = 1; i <= 5 ; i++) {
-//     await getJableFavVideo(i);
-//     await delay(5000);
-//   }
-// })();
-
-// 创建按钮的函数
+// 创建按钮
 function createFetchButton() {
-  // 创建按钮元素
   const button = document.createElement('button');
   button.textContent = '获取收藏视频数据';
   button.id = 'fetch-fav-videos-btn';
 
-  // 设置按钮样式
   button.style.cssText = `
     position: fixed;
     top: 20px;
@@ -147,7 +164,6 @@ function createFetchButton() {
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   `;
 
-  // 悬停效果
   button.addEventListener('mouseenter', () => {
     button.style.backgroundColor = '#0056b3';
   });
@@ -156,20 +172,16 @@ function createFetchButton() {
     button.style.backgroundColor = '#007bff';
   });
 
-  // 点击事件
   button.addEventListener('click', handleFetchClick);
-
-  // 添加到页面
   document.body.appendChild(button);
 
   return button;
 }
 
-// 处理按钮点击的函数
+// 处理按钮点击
 async function handleFetchClick() {
   const button = document.getElementById('fetch-fav-videos-btn');
 
-  // 禁用按钮，防止重复点击
   button.disabled = true;
   button.textContent = '获取中...';
   button.style.backgroundColor = '#6c757d';
@@ -177,11 +189,9 @@ async function handleFetchClick() {
   try {
     await fetchAllFavoriteVideos();
 
-    // 成功后更新按钮状态
     button.textContent = '获取完成 ✓';
     button.style.backgroundColor = '#28a745';
 
-    // 3秒后恢复按钮
     setTimeout(() => {
       button.disabled = false;
       button.textContent = '获取收藏视频数据';
@@ -191,11 +201,9 @@ async function handleFetchClick() {
   } catch (error) {
     console.error('获取失败:', error);
 
-    // 失败后更新按钮状态
     button.textContent = '获取失败 ✗';
     button.style.backgroundColor = '#dc3545';
 
-    // 3秒后恢复按钮
     setTimeout(() => {
       button.disabled = false;
       button.textContent = '获取收藏视频数据';
@@ -204,69 +212,62 @@ async function handleFetchClick() {
   }
 }
 
-function exportToJSON(data, filename = 'favorite_videos.json') {
-  try {
-    // 将数据转换为JSON字符串
-    const jsonString = JSON.stringify(data, null, 2);
-    
-    // 创建Blob对象
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    
-    // 创建下载链接
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    
-    // 触发下载
-    document.body.appendChild(link);
-    link.click();
-    
-    // 清理
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    console.log(`✅ 数据已导出到 ${filename}`);
-    return true;
-    
-  } catch (error) {
-    console.error('导出JSON失败:', error);
-    return false;
-  }
-}
-
 // 主要的获取数据函数
 async function fetchAllFavoriteVideos() {
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   try {
+    favVideoData = []; // 清空旧数据
+
     // 分页获取数据
     for (let i = 1; i <= totalPage; i++) {
       console.log(`📥 正在获取第 ${i}/${totalPage} 页数据...`);
 
-      // 更新按钮文本显示进度
       const button = document.getElementById('fetch-fav-videos-btn');
       button.textContent = `获取中... (${i}/${totalPage})`;
 
       await getJableFavVideo(i);
       console.log(`✅ 第 ${i} 页数据获取成功`);
 
-      // 最后一页不需要延迟
       if (i < totalPage) {
-        console.log(`⏳ 等待 5 秒后继续...`);
-        await delay(5000);
+        console.log(`⏳ 等待 1 秒后继续...`);
+        await delay(1000);
       }
     }
 
-    // 导出数据到JSON文件
-    exportToJSON(favVideoData);
+    // 通过 background.js 保存到 IndexedDB
+    await saveVideosToDB(favVideoData);
 
-    console.log('🎉 所有数据获取完成！', favVideoData.length, '条数据', favVideoData);
+    console.log(`🎉 所有数据获取完成！共 ${favVideoData.length} 条已保存到数据库`);
+    showNotification(`已保存 ${favVideoData.length} 条收藏到本地数据库`);
 
   } catch (error) {
     console.error('获取收藏视频失败:', error);
-    throw error; // 重新抛出错误，让handleFetchClick处理
+    throw error;
   }
+}
+
+// 显示通知
+function showNotification(message) {
+  const notification = document.createElement('div');
+  notification.textContent = message;
+  notification.style.cssText = `
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 10000;
+    padding: 15px 20px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    font-size: 14px;
+  `;
+  document.body.appendChild(notification);
+
+  setTimeout(() => {
+    notification.remove();
+  }, 3000);
 }
 
 // 页面加载完成后创建按钮
