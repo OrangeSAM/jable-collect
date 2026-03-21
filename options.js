@@ -41,7 +41,7 @@ class OptionsManager {
     this.allVideos = [];
     this.filteredVideos = [];
     this.currentPage = 1;
-    this.pageSize = 50;
+    this.pageSize = 24;
     this.sortField = 'addedTime';
     this.sortOrder = 'desc';
     this.searchKeyword = '';
@@ -75,7 +75,6 @@ class OptionsManager {
   }
 
   applyFiltersAndSort() {
-    // 1. 过滤
     if (this.searchKeyword) {
       const lower = this.searchKeyword.toLowerCase();
       this.filteredVideos = this.allVideos.filter(v =>
@@ -86,7 +85,6 @@ class OptionsManager {
       this.filteredVideos = [...this.allVideos];
     }
 
-    // 2. 排序
     this.filteredVideos.sort((a, b) => {
       let valA, valB;
 
@@ -130,7 +128,6 @@ class OptionsManager {
     if (!timestamp) return '未知';
     const date = new Date(timestamp);
     return date.toLocaleString('zh-CN', {
-      year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
@@ -157,17 +154,17 @@ class OptionsManager {
     }
 
     container.innerHTML = videos.map(video => `
-      <div class="video-item">
+      <div class="video-card">
         <div class="video-thumb">
           <img src="${video.imgDataSrc || video.imgSrc}" alt="${video.videoId || ''}" loading="lazy">
+          <div class="video-id-badge">${video.videoId || '未知'}</div>
         </div>
-        <div class="video-info">
-          <div class="video-id">${video.videoId || '未知番号'}</div>
+        <div class="video-content">
           <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
-          <div class="video-time">添加于 ${this.formatTime(video.addedTime)}</div>
-        </div>
-        <div class="video-actions">
-          <button class="btn btn-danger" data-url="${video.url || video.detailHref}">删除</button>
+          <div class="video-meta">
+            <span class="video-time">${this.formatTime(video.addedTime)}</span>
+            <button class="btn btn-danger" data-url="${video.url || video.detailHref}">删除</button>
+          </div>
         </div>
       </div>
     `).join('');

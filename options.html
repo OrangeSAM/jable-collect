@@ -38,7 +38,6 @@
     line-height: 1.6;
   }
 
-  /* Film grain overlay */
   body::before {
     content: '';
     position: fixed;
@@ -53,77 +52,58 @@
   }
 
   .container {
-    max-width: 1000px;
+    max-width: 80%;
     margin: 0 auto;
-    padding: 40px 24px;
+    padding: 32px 24px;
   }
 
   /* Header */
   .header {
-    text-align: center;
-    margin-bottom: 48px;
-    position: relative;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
   }
 
-  .header::after {
-    content: '';
-    position: absolute;
-    bottom: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  }
-
-  .header h1 {
+  .header-left h1 {
     font-family: var(--font-display);
     font-weight: 300;
-    font-size: 32px;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: var(--text-primary);
+    font-size: 28px;
+    letter-spacing: 3px;
   }
 
-  .header h1 span {
+  .header-left h1 span {
     color: var(--accent);
     font-weight: 600;
   }
 
-  .header p {
+  .header-left p {
     color: var(--text-dim);
     font-size: 12px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-top: 8px;
+    letter-spacing: 1px;
+    margin-top: 4px;
   }
 
-  /* Stats Bar */
-  .stats-bar {
+  .header-stats {
     display: flex;
-    justify-content: center;
-    gap: 48px;
-    padding: 24px;
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    margin-bottom: 24px;
-    border: 1px solid var(--border);
+    gap: 32px;
   }
 
-  .stat {
-    text-align: center;
+  .header-stat {
+    text-align: right;
   }
 
-  .stat-value {
+  .header-stat-value {
     font-family: var(--font-mono);
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
     color: var(--accent);
-    display: block;
   }
 
-  .stat-label {
-    font-size: 11px;
+  .header-stat-label {
+    font-size: 10px;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -134,12 +114,18 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
+    margin-bottom: 20px;
     gap: 16px;
+    flex-wrap: wrap;
   }
 
-  .toolbar-group {
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .toolbar-right {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -175,7 +161,7 @@
   }
 
   input[type="text"] {
-    min-width: 280px;
+    width: 240px;
   }
 
   .page-controls {
@@ -188,11 +174,15 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     color: var(--text-primary);
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 16px;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .page-btn:hover:not(:disabled) {
@@ -209,39 +199,34 @@
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text-secondary);
-    padding: 0 12px;
+    min-width: 70px;
+    text-align: center;
   }
 
-  /* Video Grid */
-  .video-list {
+  /* Video Grid - Grid Layout */
+  .video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .video-card {
     background: var(--bg-secondary);
-    border-radius: 16px;
+    border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
+    transition: all 0.25s ease;
   }
 
-  .video-item {
-    display: grid;
-    grid-template-columns: 120px 1fr auto;
-    gap: 20px;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.2s ease;
-  }
-
-  .video-item:last-child {
-    border-bottom: none;
-  }
-
-  .video-item:hover {
-    background: var(--bg-hover);
+  .video-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-dim);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
   }
 
   .video-thumb {
     position: relative;
-    aspect-ratio: 16/9;
-    border-radius: 6px;
+    aspect-ratio: 16/10;
     overflow: hidden;
     background: var(--bg-card);
   }
@@ -250,36 +235,58 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+
+  .video-card:hover .video-thumb img {
+    transform: scale(1.05);
   }
 
   .video-thumb::after {
     content: '';
     position: absolute;
-    inset: 0;
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 6px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.6));
     pointer-events: none;
   }
 
-  .video-info {
-    min-width: 0;
+  .video-id-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: var(--accent);
+    color: var(--bg-primary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    z-index: 1;
   }
 
-  .video-id {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--accent);
-    font-weight: 700;
-    margin-bottom: 4px;
+  .video-content {
+    padding: 16px;
   }
 
   .video-title {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-primary);
-    white-space: nowrap;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    margin-bottom: 6px;
+    margin-bottom: 12px;
+    min-height: 40px;
+  }
+
+  .video-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .video-time {
@@ -293,11 +300,11 @@
   }
 
   .btn {
-    padding: 8px 16px;
+    padding: 6px 12px;
     border: none;
     border-radius: 6px;
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -318,19 +325,23 @@
 
   /* Empty State */
   .empty-state {
+    grid-column: 1 / -1;
     padding: 80px 40px;
     text-align: center;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border);
   }
 
   .empty-state-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 24px;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 20px;
     opacity: 0.3;
   }
 
   .empty-state h3 {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 400;
     color: var(--text-secondary);
     margin-bottom: 8px;
@@ -341,15 +352,18 @@
     color: var(--text-dim);
   }
 
-  /* Pagination */
-  .pagination {
+  /* Pagination Bar */
+  .pagination-bar {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px;
-    background: var(--bg-card);
-    border-top: 1px solid var(--border);
+    margin-top: 24px;
     gap: 16px;
+  }
+
+  .pagination-info {
+    font-size: 12px;
+    color: var(--text-dim);
   }
 
   /* Data Actions */
@@ -357,13 +371,16 @@
     display: flex;
     justify-content: center;
     gap: 12px;
-    margin-top: 24px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
   }
 
   .btn-secondary {
     background: var(--bg-card);
     border: 1px solid var(--border);
     color: var(--text-secondary);
+    padding: 10px 20px;
   }
 
   .btn-secondary:hover {
@@ -374,6 +391,7 @@
   .btn-accent {
     background: var(--accent);
     color: var(--bg-primary);
+    padding: 10px 20px;
   }
 
   .btn-accent:hover {
@@ -413,12 +431,16 @@
 
   /* Loading */
   .loading {
+    grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 80px 40px;
     gap: 16px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border);
   }
 
   .spinner {
@@ -441,34 +463,33 @@
 
   /* Responsive */
   @media (max-width: 768px) {
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .header-stats {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
     .toolbar {
       flex-direction: column;
       align-items: stretch;
     }
 
-    .toolbar-group {
-      justify-content: space-between;
+    .toolbar-left, .toolbar-right {
+      flex-wrap: wrap;
     }
 
     input[type="text"] {
-      min-width: 100%;
+      width: 100%;
     }
 
-    .video-item {
-      grid-template-columns: 80px 1fr;
-    }
-
-    .video-actions {
-      grid-column: 1 / -1;
-      justify-content: flex-end;
-    }
-
-    .stats-bar {
-      gap: 24px;
-    }
-
-    .stat-value {
-      font-size: 22px;
+    .video-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
     }
   }
 </style>
@@ -476,49 +497,48 @@
 <body>
   <div class="container">
     <header class="header">
-      <h1>Jable <span>Collection</span></h1>
-      <p>视频收藏管理</p>
+      <div class="header-left">
+        <h1>Jable <span>Collection</span></h1>
+        <p>视频收藏管理</p>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat">
+          <div class="header-stat-value" id="total-count">-</div>
+          <div class="header-stat-label">总收藏</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-value" id="display-count">-</div>
+          <div class="header-stat-label">当前显示</div>
+        </div>
+      </div>
     </header>
 
-    <div class="stats-bar">
-      <div class="stat">
-        <span class="stat-value" id="total-count">-</span>
-        <span class="stat-label">总收藏</span>
-      </div>
-      <div class="stat">
-        <span class="stat-value" id="display-count">-</span>
-        <span class="stat-label">当前显示</span>
-      </div>
-    </div>
-
     <div class="toolbar">
-      <div class="toolbar-group">
-        <span class="toolbar-label">排序</span>
+      <div class="toolbar-left">
         <select id="sort-select">
           <option value="addedTime-desc">最新添加</option>
           <option value="addedTime-asc">最早添加</option>
           <option value="videoId-asc">番号 A→Z</option>
           <option value="videoId-desc">番号 Z→A</option>
         </select>
-      </div>
-
-      <div class="toolbar-group">
         <input type="text" id="search-input" placeholder="搜索番号或标题...">
       </div>
 
-      <div class="toolbar-group page-controls">
-        <button class="page-btn" id="prev-btn">‹</button>
-        <span class="page-info" id="page-info">1 / 1</span>
-        <button class="page-btn" id="next-btn">›</button>
+      <div class="toolbar-right">
+        <div class="page-controls">
+          <button class="page-btn" id="prev-btn">‹</button>
+          <span class="page-info" id="page-info">1 / 1</span>
+          <button class="page-btn" id="next-btn">›</button>
+        </div>
         <select id="page-size">
-          <option value="20">20</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
+          <option value="12">12/页</option>
+          <option value="24" selected>24/页</option>
+          <option value="48">48/页</option>
         </select>
       </div>
     </div>
 
-    <div class="video-list" id="video-list">
+    <div class="video-grid" id="video-list">
       <div class="loading">
         <div class="spinner"></div>
         <p>加载中...</p>
@@ -528,7 +548,7 @@
     <div class="data-actions">
       <button class="btn btn-secondary" id="export-data">导出</button>
       <button class="btn btn-secondary" id="import-data">导入</button>
-      <button class="btn btn-danger" id="clear-data">清空</button>
+      <button class="btn btn-secondary" id="clear-data" style="border-color: var(--danger); color: var(--danger);">清空</button>
       <input type="file" id="import-file" accept=".json" style="display:none">
     </div>
   </div>
