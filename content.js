@@ -260,8 +260,8 @@ async function fetchAllFavoriteVideos() {
       console.log(`✅ 第 ${i} 页${pageType}数据获取成功`);
 
       if (i < totalPage) {
-        console.log(`⏳ 等待 1 秒后继续...`);
-        await delay(1000);
+        console.log(`⏳ 等待 3 秒后继续...`);
+        await delay(3000);
       }
     }
 

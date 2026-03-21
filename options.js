@@ -187,28 +187,41 @@ class OptionsManager {
     container.innerHTML = videos.map(video => {
       const source = this.getSourceInfo(video);
       return `
-      <div class="video-card">
+      <div class="video-card" data-url="${video.url || video.detailHref}">
         <div class="video-thumb">
           <img src="${video.imgDataSrc || video.imgSrc}" alt="${video.videoId || ''}" loading="lazy">
-          <div class="video-id-badge">${video.videoId || '未知'}</div>
+          ${video.preview ? `<video class="video-preview" src="${video.preview}" muted loop preload="none"></video>` : ''}
         </div>
         <div class="video-content">
           <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
           <div class="video-meta">
-            <span class="video-source-badge ${source.className}">${source.label}</span>
-            <button class="btn btn-danger" data-url="${video.url || video.detailHref}">删除</button>
+            <div class="video-tags">
+              <span class="video-id-tag">${video.videoId || '未知'}</span>
+              <span class="video-source-badge ${source.className}">${source.label}</span>
+            </div>
           </div>
         </div>
       </div>
     `;
     }).join('');
 
-    container.querySelectorAll('.btn-danger').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const url = e.target.dataset.url;
-        if (confirm('确定要删除这条收藏吗？')) {
-          await this.deleteVideo(url);
-        }
+    // 绑定 hover preview 事件
+    container.querySelectorAll('.video-card').forEach(card => {
+      const video = card.querySelector('video');
+      if (!video) return;
+
+      card.addEventListener('mouseenter', () => {
+        video.play().catch(() => {});
+      });
+
+      card.addEventListener('mouseleave', () => {
+        video.pause();
+        video.currentTime = 0;
+      });
+
+      card.addEventListener('click', () => {
+        const url = card.dataset.url;
+        if (url) window.open(url, '_blank');
       });
     });
 
