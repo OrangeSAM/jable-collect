@@ -61,7 +61,7 @@ async function saveVideos(videos) {
 
     videos.forEach(video => {
       video.videoId = video.videoId || extractVideoId(video.detailHref || video.url);
-      video.addedTime = video.addedTime || Date.now();
+      // 不设置 addedTime，保持 Jable 原始顺序
       store.put(video);
     });
 

@@ -42,8 +42,8 @@ class OptionsManager {
     this.filteredVideos = [];
     this.currentPage = 1;
     this.pageSize = 24;
-    this.sortField = 'addedTime';
-    this.sortOrder = 'desc';
+    this.sortField = 'original';
+    this.sortOrder = 'asc';
     this.searchKeyword = '';
 
     this.init();
@@ -85,31 +85,34 @@ class OptionsManager {
       this.filteredVideos = [...this.allVideos];
     }
 
-    this.filteredVideos.sort((a, b) => {
-      let valA, valB;
+    // 原始顺序不需要排序
+    if (this.sortField !== 'original') {
+      this.filteredVideos.sort((a, b) => {
+        let valA, valB;
 
-      if (this.sortField === 'addedTime') {
-        valA = a.addedTime || 0;
-        valB = b.addedTime || 0;
-      } else if (this.sortField === 'videoId') {
-        valA = (a.videoId || '').toLowerCase();
-        valB = (b.videoId || '').toLowerCase();
-        const parseId = (id) => {
-          const match = id.match(/^([A-Z]+)-?(\d+)$/i);
-          return match ? [match[1].toUpperCase(), parseInt(match[2], 10)] : [id.toUpperCase(), 0];
-        };
-        const [prefixA, numA] = parseId(valA);
-        const [prefixB, numB] = parseId(valB);
-        if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
-        return numA - numB;
-      }
+        if (this.sortField === 'addedTime') {
+          valA = a.addedTime || 0;
+          valB = b.addedTime || 0;
+        } else if (this.sortField === 'videoId') {
+          valA = (a.videoId || '').toLowerCase();
+          valB = (b.videoId || '').toLowerCase();
+          const parseId = (id) => {
+            const match = id.match(/^([A-Z]+)-?(\d+)$/i);
+            return match ? [match[1].toUpperCase(), parseInt(match[2], 10)] : [id.toUpperCase(), 0];
+          };
+          const [prefixA, numA] = parseId(valA);
+          const [prefixB, numB] = parseId(valB);
+          if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
+          return numA - numB;
+        }
 
-      if (this.sortOrder === 'desc') {
-        return valB > valA ? 1 : valB < valA ? -1 : 0;
-      } else {
-        return valA > valB ? 1 : valA < valB ? -1 : 0;
-      }
-    });
+        if (this.sortOrder === 'desc') {
+          return valB > valA ? 1 : valB < valA ? -1 : 0;
+        } else {
+          return valA > valB ? 1 : valA < valB ? -1 : 0;
+        }
+      });
+    }
 
     this.currentPage = 1;
   }
@@ -162,7 +165,6 @@ class OptionsManager {
         <div class="video-content">
           <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
           <div class="video-meta">
-            <span class="video-time">${this.formatTime(video.addedTime)}</span>
             <button class="btn btn-danger" data-url="${video.url || video.detailHref}">删除</button>
           </div>
         </div>
