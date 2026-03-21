@@ -1,0 +1,28 @@
+{
+"manifest_version": 3,
+"name": "收藏分类管理器",
+"version": "1.0",
+"description": "为网站收藏功能添加分类管理",
+"permissions": [
+  "storage",
+  "activeTab",
+  "scripting"
+],
+"host_permissions": [
+  "https://jable.tv/*"
+],
+"background": {
+  "service_worker": "background.js"
+},
+"content_scripts": [
+  {
+    "matches": ["https://jable.tv/my/favourites/videos/*"],
+    "js": ["content.js"]
+  }
+],
+"action": {
+  "default_popup": "popup.html",
+  "default_title": "收藏分类管理"
+},
+"options_page": "options.html"
+}

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>收藏分类管理器 - 设置</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f5f5f5;
+  }
+  
+  .container {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  
+  .header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #eee;
+  }
+  
+  .section {
+    margin-bottom: 30px;
+  }
+  
+  .section h3 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 18px;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .form-group textarea {
+    height: 100px;
+    resize: vertical;
+  }
+  
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .checkbox-group input[type="checkbox"] {
+    width: auto;
+  }
+  
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .btn-primary {
+    background: #007bff;
+    color: white;
+  }
+  
+  .btn-success {
+    background: #28a745;
+    color: white;
+  }
+  
+  .btn-danger {
+    background: #dc3545;
+    color: white;
+  }
+  
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+  
+  .status-message {
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+    display: none;
+  }
+  
+  .status-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+  
+  .status-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+  }
+  
+  .data-preview {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>收藏分类管理器 - 设置</h1>
+    <p>配置插件的各项功能和参数</p>
+  </div>
+  
+  <div class="section">
+    <h3>基本设置</h3>
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="checkbox" id="auto-sync" checked>
+        <label for="auto-sync">自动同步收藏数据</label>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="checkbox" id="show-panel" checked>
+        <label for="show-panel">显示分类管理面板</label>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label for="sync-interval">同步间隔（秒）</label>
+      <input type="number" id="sync-interval" value="30" min="10" max="300">
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>界面设置</h3>
+    <div class="form-group">
+      <label for="panel-position">面板位置</label>
+      <select id="panel-position">
+        <option value="left">左侧</option>
+        <option value="right" selected>右侧</option>
+        <option value="top">顶部</option>
+        <option value="bottom">底部</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label for="theme">主题</label>
+      <select id="theme">
+        <option value="light" selected>浅色</option>
+        <option value="dark">深色</option>
+        <option value="auto">跟随系统</option>
+      </select>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>数据管理</h3>
+    <div class="form-group">
+      <button class="btn btn-primary" id="export-data">导出所有数据</button>
+      <button class="btn btn-secondary" id="import-data">导入数据</button>
+      <button class="btn btn-danger" id="clear-data">清空所有数据</button>
+    </div>
+    
+    <div class="form-group">
+      <label for="import-file">选择导入文件</label>
+      <input type="file" id="import-file" accept=".json">
+    </div>
+    
+    <div class="form-group">
+      <label>当前数据预览</label>
+      <div class="data-preview" id="data-preview">
+        加载中...
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h3>高级设置</h3>
+    <div class="form-group">
+      <label for="custom-selectors">自定义选择器（用于识别收藏项）</label>
+      <textarea id="custom-selectors" placeholder="输入CSS选择器，每行一个">.video-item
+.thumb-item
+[class*="video"]</textarea>
+    </div>
+    
+    <div class="form-group">
+      <div class="checkbox-group">
+        <input type="checkbox" id="debug-mode">
+        <label for="debug-mode">调试模式（控制台输出详细日志）</label>
+      </div>
+    </div>
+  </div>
+  
+  <div class="form-group">
+    <button class="btn btn-success" id="save-settings">保存设置</button>
+    <button class="btn btn-secondary" id="reset-settings">重置为默认</button>
+  </div>
+  
+  <div class="status-message" id="status-message"></div>
+</div>
+
+<script src="options.js"></script>
+</body>
+</html>
