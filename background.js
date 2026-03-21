@@ -1,9 +1,10 @@
 // ========== IndexedDB 数据库操作 ==========
 const DB_NAME = 'jable_collect';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'videos';
 
 let db = null;
+let orderCounter = 0; // 用于追踪原始顺序
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -22,7 +23,17 @@ function openDB() {
         const store = database.createObjectStore(STORE_NAME, { keyPath: 'url' });
         store.createIndex('videoId', 'videoId', { unique: false });
         store.createIndex('title', 'title', { unique: false });
-        store.createIndex('addedTime', 'addedTime', { unique: false });
+        store.createIndex('order', 'order', { unique: false });
+        store.createIndex('pageType', 'pageType', { unique: false });
+      } else if (event.oldVersion < 2) {
+        // 升级版本：添加 order 和 pageType 索引
+        const store = database.transaction(STORE_NAME, 'versionchange').objectStore(STORE_NAME);
+        if (!store.indexNames.contains('order')) {
+          store.createIndex('order', 'order', { unique: false });
+        }
+        if (!store.indexNames.contains('pageType')) {
+          store.createIndex('pageType', 'pageType', { unique: false });
+        }
       }
     };
   });
@@ -35,24 +46,8 @@ async function initDB() {
   return db;
 }
 
-// 保存单条视频
-async function saveVideo(video) {
-  await initDB();
-
-  video.videoId = video.videoId || extractVideoId(video.detailHref || video.url);
-  video.addedTime = video.addedTime || Date.now();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.put(video);
-    request.onsuccess = () => resolve(video);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 // 批量保存视频
-async function saveVideos(videos) {
+async function saveVideos(videos, pageType = 'favorites') {
   await initDB();
 
   return new Promise((resolve, reject) => {
@@ -61,7 +56,12 @@ async function saveVideos(videos) {
 
     videos.forEach(video => {
       video.videoId = video.videoId || extractVideoId(video.detailHref || video.url);
-      // 不设置 addedTime，保持 Jable 原始顺序
+      video.pageType = pageType;
+      // 如果没有 order 字段，则分配一个新顺序
+      if (!video.order) {
+        orderCounter++;
+        video.order = orderCounter;
+      }
       store.put(video);
     });
 
@@ -170,7 +170,7 @@ async function handleMessage(request, sender, sendResponse) {
 
       case 'syncFavorites':
         // 处理来自 content.js 的同步请求
-        await saveVideos(request.videos);
+        await saveVideos(request.videos, request.pageType);
         const newCount = await getVideoCount();
         sendResponse({ success: true, count: newCount });
         break;

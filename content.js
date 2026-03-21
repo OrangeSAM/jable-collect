@@ -116,6 +116,11 @@ function extractVideoId(url) {
 
 // ========== 与 background.js 通信 ==========
 
+// 判断当前页面类型
+const isWatchLaterPage = window.location.pathname.includes('watch-later');
+const pageType = isWatchLaterPage ? '稍后观看' : '收藏';
+const pageTypeKey = isWatchLaterPage ? 'watchLater' : 'favorites';
+
 // 发送消息到 background.js
 function sendToBackground(action, data = {}) {
   return new Promise((resolve, reject) => {
@@ -131,7 +136,7 @@ function sendToBackground(action, data = {}) {
 
 // 保存视频到 IndexedDB（通过 background.js）
 async function saveVideosToDB(videos) {
-  const response = await sendToBackground('syncFavorites', { videos });
+  const response = await sendToBackground('syncFavorites', { videos, pageType: pageTypeKey });
   if (!response.success) {
     throw new Error(response.error);
   }
@@ -139,14 +144,14 @@ async function saveVideosToDB(videos) {
 }
 
 // 开始执行
-console.log('已初始化收藏插件');
+console.log(`已初始化收藏插件 - ${pageType}页面`);
 getTotalPage();
-console.log(`总共有${totalPage}页收藏数据`);
+console.log(`总共有${totalPage}页${pageType}数据`);
 
 // 创建按钮
 function createFetchButton() {
   const button = document.createElement('button');
-  button.textContent = '获取收藏视频数据';
+  button.textContent = `获取${pageType}数据`;
   button.id = 'fetch-fav-videos-btn';
 
   button.style.cssText = `
@@ -194,7 +199,7 @@ async function handleFetchClick() {
 
     setTimeout(() => {
       button.disabled = false;
-      button.textContent = '获取收藏视频数据';
+      button.textContent = `获取${pageType}数据`;
       button.style.backgroundColor = '#007bff';
     }, 3000);
 
@@ -206,7 +211,7 @@ async function handleFetchClick() {
 
     setTimeout(() => {
       button.disabled = false;
-      button.textContent = '获取收藏视频数据';
+      button.textContent = `获取${pageType}数据`;
       button.style.backgroundColor = '#007bff';
     }, 3000);
   }
@@ -216,18 +221,22 @@ async function handleFetchClick() {
 async function fetchAllFavoriteVideos() {
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // 根据页面类型选择数据获取函数
+  const fetchFunc = isWatchLaterPage ? getJableWatchLater : getJableFavVideo;
+  const dataArray = isWatchLaterPage ? laterData : favVideoData;
+
   try {
-    favVideoData = []; // 清空旧数据
+    dataArray.length = 0; // 清空旧数据
 
     // 分页获取数据
     for (let i = 1; i <= totalPage; i++) {
-      console.log(`📥 正在获取第 ${i}/${totalPage} 页数据...`);
+      console.log(`📥 正在获取第 ${i}/${totalPage} 页${pageType}数据...`);
 
       const button = document.getElementById('fetch-fav-videos-btn');
       button.textContent = `获取中... (${i}/${totalPage})`;
 
-      await getJableFavVideo(i);
-      console.log(`✅ 第 ${i} 页数据获取成功`);
+      await fetchFunc(i);
+      console.log(`✅ 第 ${i} 页${pageType}数据获取成功`);
 
       if (i < totalPage) {
         console.log(`⏳ 等待 1 秒后继续...`);
@@ -236,13 +245,13 @@ async function fetchAllFavoriteVideos() {
     }
 
     // 通过 background.js 保存到 IndexedDB
-    await saveVideosToDB(favVideoData);
+    await saveVideosToDB(dataArray);
 
-    console.log(`🎉 所有数据获取完成！共 ${favVideoData.length} 条已保存到数据库`);
-    showNotification(`已保存 ${favVideoData.length} 条收藏到本地数据库`);
+    console.log(`🎉 所有${pageType}数据获取完成！共 ${dataArray.length} 条已保存到数据库`);
+    showNotification(`已保存 ${dataArray.length} 条${pageType}到本地数据库`);
 
   } catch (error) {
-    console.error('获取收藏视频失败:', error);
+    console.error(`获取${pageType}数据失败:`, error);
     throw error;
   }
 }
