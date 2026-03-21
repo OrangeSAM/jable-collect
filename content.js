@@ -1,19 +1,40 @@
 // 先获取总共有多少页，页数需要作为接口的参数
 let totalPage = 0;
 function getTotalPage() {
-  const allPageLinks = document.querySelectorAll('a.page-link[data-parameters*="from_my_fav_videos"]');
-  const lastPageLink = Array.from(allPageLinks).find(link => link.textContent.includes('最後'));
-
-  if (lastPageLink) {
-    const dataParameters = lastPageLink.getAttribute('data-parameters');
-    console.log('data-parameters:', dataParameters);
-
-    let match = dataParameters.match(/from_my_fav_videos:(\d+)/);
+  // 收藏页：data-parameters 含 from_my_fav_videos
+  const paramLinks = document.querySelectorAll('a.page-link[data-parameters*="from_my_fav_videos"]');
+  const lastParamLink = Array.from(paramLinks).find(link => link.textContent.includes('最後'));
+  if (lastParamLink) {
+    const match = lastParamLink.getAttribute('data-parameters').match(/from_my_fav_videos:(\d+)/);
     if (match) {
       totalPage = parseInt(match[1]);
-      console.log('提取到的数字:', totalPage);
+      console.log('提取到的总页数（data-parameters）:', totalPage);
+      return;
     }
   }
+
+  // 稍后观看页：普通 href 分页，找最后一页
+  const allPageLinks = Array.from(document.querySelectorAll('a.page-link'));
+  const lastHrefLink = allPageLinks.find(link => link.textContent.includes('最後'));
+  if (lastHrefLink) {
+    const m = (lastHrefLink.href || '').match(/[?&]page=(\d+)/);
+    if (m) {
+      totalPage = parseInt(m[1]);
+      console.log('提取到的总页数（href page=）:', totalPage);
+      return;
+    }
+  }
+
+  // fallback：取页码链接中的最大数字
+  const nums = allPageLinks.map(l => parseInt(l.textContent.trim())).filter(n => !isNaN(n));
+  if (nums.length) {
+    totalPage = Math.max(...nums);
+    console.log('提取到的总页数（fallback max）:', totalPage);
+    return;
+  }
+
+  totalPage = 1;
+  console.log('无法识别分页，默认 totalPage = 1');
 }
 
 // jable 影片收藏
@@ -62,7 +83,7 @@ function getJableFavVideo(page) {
 // jable 稍后观看
 let laterData = [];
 function getJableWatchLater(page) {
-  return fetch("https://jable.tv/my/favourites/videos-watch-later/?mode=async&function=get_block&block_id=list_videos_my_favourite_videos&fav_type=1&playlist_id=0&sort_by=&from_my_fav_videos=26&page=" + page + "&_=" + Date.now(), {
+  return fetch("https://jable.tv/my/favourites/videos-watch-later/?mode=async&function=get_block&block_id=list_videos_my_favourite_videos&fav_type=1&playlist_id=0&sort_by=&from_my_fav_videos=" + page + "&_=" + Date.now(), {
     "headers": {
       "accept": "*/*",
       "accept-language": "zh-CN,zh;q=0.9",

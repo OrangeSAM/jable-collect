@@ -461,6 +461,71 @@
     font-size: 13px;
   }
 
+  /* Source filter tabs */
+  .source-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+  }
+
+  .source-tab {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .source-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .source-tab.active {
+    background: var(--accent);
+    color: var(--bg-primary);
+  }
+
+  /* Source badge on card */
+  .video-source-badge {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    padding: 2px 7px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+
+  .video-source-badge.favorites {
+    background: rgba(232, 168, 76, 0.15);
+    color: var(--accent);
+    border: 1px solid rgba(232, 168, 76, 0.3);
+  }
+
+  .video-source-badge.watch-later {
+    background: rgba(92, 184, 92, 0.15);
+    color: var(--success);
+    border: 1px solid rgba(92, 184, 92, 0.3);
+  }
+
+  .video-source-badge.both {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
   /* Responsive */
   @media (max-width: 768px) {
     .header {
@@ -515,6 +580,11 @@
 
     <div class="toolbar">
       <div class="toolbar-left">
+        <div class="source-tabs" id="source-tabs">
+          <button class="source-tab active" data-source="all">全部</button>
+          <button class="source-tab" data-source="favorites">收藏</button>
+          <button class="source-tab" data-source="watchLater">稍后观看</button>
+        </div>
         <select id="sort-select">
           <option value="original">原始顺序</option>
           <option value="addedTime-desc">最新添加</option>

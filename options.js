@@ -45,6 +45,7 @@ class OptionsManager {
     this.sortField = 'original';
     this.sortOrder = 'asc';
     this.searchKeyword = '';
+    this.sourceFilter = 'all'; // 'all' | 'favorites' | 'watchLater'
 
     this.init();
   }
@@ -75,15 +76,25 @@ class OptionsManager {
   }
 
   applyFiltersAndSort() {
+    let base = [...this.allVideos];
+
+    // 来源过滤
+    if (this.sourceFilter === 'favorites') {
+      base = base.filter(v => v.inFavorites || v.pageType === 'favorites');
+    } else if (this.sourceFilter === 'watchLater') {
+      base = base.filter(v => v.inWatchLater || v.pageType === 'watchLater');
+    }
+
+    // 关键词搜索
     if (this.searchKeyword) {
       const lower = this.searchKeyword.toLowerCase();
-      this.filteredVideos = this.allVideos.filter(v =>
+      base = base.filter(v =>
         (v.videoId && v.videoId.toLowerCase().includes(lower)) ||
         (v.detailTitle && v.detailTitle.toLowerCase().includes(lower))
       );
-    } else {
-      this.filteredVideos = [...this.allVideos];
     }
+
+    this.filteredVideos = base;
 
     // 排序
     this.filteredVideos.sort((a, b) => {
@@ -142,6 +153,19 @@ class OptionsManager {
     });
   }
 
+  getSourceInfo(video) {
+    const inFavorites = video.inFavorites || video.pageType === 'favorites';
+    const inWatchLater = video.inWatchLater || video.pageType === 'watchLater';
+
+    if (inFavorites && inWatchLater) {
+      return { label: '双来源', className: 'both' };
+    }
+    if (inWatchLater) {
+      return { label: '稍后观看', className: 'watch-later' };
+    }
+    return { label: '收藏', className: 'favorites' };
+  }
+
   renderVideoList() {
     const container = document.getElementById('video-list');
     const videos = this.getPaginatedVideos();
@@ -160,7 +184,9 @@ class OptionsManager {
       return;
     }
 
-    container.innerHTML = videos.map(video => `
+    container.innerHTML = videos.map(video => {
+      const source = this.getSourceInfo(video);
+      return `
       <div class="video-card">
         <div class="video-thumb">
           <img src="${video.imgDataSrc || video.imgSrc}" alt="${video.videoId || ''}" loading="lazy">
@@ -169,11 +195,13 @@ class OptionsManager {
         <div class="video-content">
           <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
           <div class="video-meta">
+            <span class="video-source-badge ${source.className}">${source.label}</span>
             <button class="btn btn-danger" data-url="${video.url || video.detailHref}">删除</button>
           </div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     container.querySelectorAll('.btn-danger').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -197,6 +225,17 @@ class OptionsManager {
   updateStats() {
     document.getElementById('total-count').textContent = this.allVideos.length;
     document.getElementById('display-count').textContent = this.filteredVideos.length;
+  }
+
+  setSourceFilter(source) {
+    this.sourceFilter = source;
+    // 更新 tab 样式
+    document.querySelectorAll('#source-tabs .source-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.source === source);
+    });
+    this.applyFiltersAndSort();
+    this.renderVideoList();
+    this.updateStats();
   }
 
   async deleteVideo(url) {
@@ -299,6 +338,11 @@ class OptionsManager {
   }
 
   bindEvents() {
+    document.getElementById('source-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('.source-tab');
+      if (btn) this.setSourceFilter(btn.dataset.source);
+    });
+
     document.getElementById('search-input').addEventListener('input', (e) => {
       this.setSearch(e.target.value);
     });
