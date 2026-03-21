@@ -16,7 +16,7 @@
 },
 "content_scripts": [
   {
-    "matches": ["https://jable.tv/my/favourites/videos/*"],
+    "matches": ["https://jable.tv/my/favourites/*"],
     "js": ["content.js"]
   }
 ],
