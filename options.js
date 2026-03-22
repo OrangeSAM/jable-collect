@@ -1,3 +1,11 @@
+// ========== 工具函数 ==========
+
+function hasSource(video, source) {
+  if (source === 'favorites') return video.inFavorites || video.pageType === 'favorites';
+  if (source === 'watchLater') return video.inWatchLater || video.pageType === 'watchLater';
+  return true;
+}
+
 // ========== 与 background.js 通信 ==========
 
 function sendToBackground(action, data = {}) {
@@ -79,10 +87,8 @@ class OptionsManager {
     let base = [...this.allVideos];
 
     // 来源过滤
-    if (this.sourceFilter === 'favorites') {
-      base = base.filter(v => v.inFavorites || v.pageType === 'favorites');
-    } else if (this.sourceFilter === 'watchLater') {
-      base = base.filter(v => v.inWatchLater || v.pageType === 'watchLater');
+    if (this.sourceFilter !== 'all') {
+      base = base.filter(v => hasSource(v, this.sourceFilter));
     }
 
     // 关键词搜索
@@ -154,8 +160,8 @@ class OptionsManager {
   }
 
   getSourceInfo(video) {
-    const inFavorites = video.inFavorites || video.pageType === 'favorites';
-    const inWatchLater = video.inWatchLater || video.pageType === 'watchLater';
+    const inFavorites = hasSource(video, 'favorites');
+    const inWatchLater = hasSource(video, 'watchLater');
 
     if (inFavorites && inWatchLater) {
       return { label: '双来源', className: 'both' };
@@ -240,15 +246,19 @@ class OptionsManager {
     document.getElementById('display-count').textContent = this.filteredVideos.length;
   }
 
+  refresh() {
+    this.applyFiltersAndSort();
+    this.renderVideoList();
+    this.updateStats();
+  }
+
   setSourceFilter(source) {
     this.sourceFilter = source;
     // 更新 tab 样式
     document.querySelectorAll('#source-tabs .source-tab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.source === source);
     });
-    this.applyFiltersAndSort();
-    this.renderVideoList();
-    this.updateStats();
+    this.refresh();
   }
 
   async deleteVideo(url) {
@@ -265,9 +275,7 @@ class OptionsManager {
   setSort(field, order) {
     this.sortField = field;
     this.sortOrder = order;
-    this.applyFiltersAndSort();
-    this.renderVideoList();
-    this.updateStats();
+    this.refresh();
   }
 
   setPage(page) {
@@ -288,14 +296,12 @@ class OptionsManager {
 
   setSearch(keyword) {
     this.searchKeyword = keyword;
-    this.applyFiltersAndSort();
-    this.renderVideoList();
-    this.updateStats();
+    this.refresh();
   }
 
   async exportData() {
     try {
-      const videos = await getAllVideosFromDB();
+      const videos = this.allVideos;
       const blob = new Blob([JSON.stringify(videos, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
