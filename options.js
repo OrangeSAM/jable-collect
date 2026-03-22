@@ -104,35 +104,21 @@ class OptionsManager {
 
     // 排序
     this.filteredVideos.sort((a, b) => {
-      let valA, valB;
-
       if (this.sortField === 'original') {
-        // 按插入顺序排序
-        valA = a.order || 0;
-        valB = b.order || 0;
-        return valA - valB;
-      } else if (this.sortField === 'addedTime') {
-        valA = a.addedTime || 0;
-        valB = b.addedTime || 0;
-      } else if (this.sortField === 'videoId') {
-        valA = (a.videoId || '').toLowerCase();
-        valB = (b.videoId || '').toLowerCase();
+        return (a.order || 0) - (b.order || 0);
+      }
+      if (this.sortField === 'videoId') {
         const parseId = (id) => {
-          const match = id.match(/^([A-Z]+)-?(\d+)$/i);
-          return match ? [match[1].toUpperCase(), parseInt(match[2], 10)] : [id.toUpperCase(), 0];
+          const match = (id || '').match(/^([A-Z]+)-?(\d+)$/i);
+          return match ? [match[1].toUpperCase(), parseInt(match[2], 10)] : ['', 0];
         };
-        const [prefixA, numA] = parseId(valA);
-        const [prefixB, numB] = parseId(valB);
-        if (prefixA !== prefixB) return prefixA.localeCompare(prefixB);
-        return numA - numB;
+        const [prefixA, numA] = parseId(a.videoId);
+        const [prefixB, numB] = parseId(b.videoId);
+        const dir = this.sortOrder === 'desc' ? -1 : 1;
+        if (prefixA !== prefixB) return prefixA.localeCompare(prefixB) * dir;
+        return (numA - numB) * dir;
       }
-
-      // 数字或字符串比较
-      if (this.sortOrder === 'desc') {
-        return valB > valA ? 1 : valB < valA ? -1 : 0;
-      } else {
-        return valA > valB ? 1 : valA < valB ? -1 : 0;
-      }
+      return 0;
     });
 
     this.currentPage = 1;
