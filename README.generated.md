@@ -62,6 +62,10 @@ To modify this extension:
 3. Edit `background.js` for service worker logic
 4. Reload the extension in `chrome://extensions/` after changes
 
+## Architecture
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical documentation including storage implementation, data flow, and dual-source merge mechanism.
+
 ## License
 
 MIT

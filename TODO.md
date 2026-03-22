@@ -2,10 +2,10 @@
 
 ## 存储层改造
 
-- [ ] 将数据存储从 JSON 导出改为 IndexedDB
+- [x] 将数据存储从 JSON 导出改为 IndexedDB ✅
   - 设计数据库 schema（表名、字段、索引）
   - 实现 `saveVideos()` / `getVideos()` / `deleteVideo()` 等基础操作
-  - 增量同步支持（记录上次同步时间）
+  - [ ] 增量同步支持（记录上次同步时间）
 
 ## 数据增强
 
