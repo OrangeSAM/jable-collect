@@ -172,34 +172,49 @@ console.log(`总共有${totalPage}页${pageType}数据`);
 // 创建按钮
 function createFetchButton() {
   const button = document.createElement('button');
-  button.textContent = `获取${pageType}数据`;
+  button.textContent = `📥 获取${pageType}数据`;
   button.id = 'fetch-fav-videos-btn';
 
   button.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    padding: 10px 15px;
-    background-color: #007bff;
-    color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #e85d04 0%, #dc2f02 100%);
+    color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 20px;
     cursor: pointer;
-    font-size: 14px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 8px rgba(220, 47, 2, 0.35);
   `;
 
   button.addEventListener('mouseenter', () => {
-    button.style.backgroundColor = '#0056b3';
+    button.style.transform = 'translateY(-1px)';
+    button.style.boxShadow = '0 4px 12px rgba(220, 47, 2, 0.5)';
+    button.style.filter = 'brightness(1.1)';
   });
 
   button.addEventListener('mouseleave', () => {
-    button.style.backgroundColor = '#007bff';
+    button.style.transform = 'translateY(0)';
+    button.style.boxShadow = '0 2px 8px rgba(220, 47, 2, 0.35)';
+    button.style.filter = 'brightness(1)';
   });
 
   button.addEventListener('click', handleFetchClick);
-  document.body.appendChild(button);
+
+  // 插入到 profile-nav 区域内
+  const profileNav = document.querySelector('.profile-nav');
+  if (profileNav) {
+    const container = document.createElement('div');
+    container.style.cssText = 'display: inline-flex; align-items: center; margin-left: 12px;';
+    container.appendChild(button);
+    profileNav.appendChild(container);
+  } else {
+    document.body.appendChild(button);
+  }
 
   return button;
 }
@@ -209,31 +224,36 @@ async function handleFetchClick() {
   const button = document.getElementById('fetch-fav-videos-btn');
 
   button.disabled = true;
-  button.textContent = '获取中...';
-  button.style.backgroundColor = '#6c757d';
+  button.textContent = '⏳ 获取中...';
+  button.style.background = 'linear-gradient(135deg, #6c757d 0%, #495057 100%)';
+  button.style.boxShadow = 'none';
 
   try {
     await fetchAllFavoriteVideos();
 
-    button.textContent = '获取完成 ✓';
-    button.style.backgroundColor = '#28a745';
+    button.textContent = '✅ 获取完成';
+    button.style.background = 'linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%)';
+    button.style.boxShadow = '0 2px 8px rgba(27, 67, 50, 0.4)';
 
     setTimeout(() => {
       button.disabled = false;
-      button.textContent = `获取${pageType}数据`;
-      button.style.backgroundColor = '#007bff';
+      button.textContent = `📥 获取${pageType}数据`;
+      button.style.background = 'linear-gradient(135deg, #e85d04 0%, #dc2f02 100%)';
+      button.style.boxShadow = '0 2px 8px rgba(220, 47, 2, 0.35)';
     }, 3000);
 
   } catch (error) {
     console.error('获取失败:', error);
 
-    button.textContent = '获取失败 ✗';
-    button.style.backgroundColor = '#dc3545';
+    button.textContent = '❌ 获取失败';
+    button.style.background = 'linear-gradient(135deg, #c92a2a 0%, #a61e1e 100%)';
+    button.style.boxShadow = '0 2px 8px rgba(166, 30, 30, 0.4)';
 
     setTimeout(() => {
       button.disabled = false;
-      button.textContent = `获取${pageType}数据`;
-      button.style.backgroundColor = '#007bff';
+      button.textContent = `📥 获取${pageType}数据`;
+      button.style.background = 'linear-gradient(135deg, #e85d04 0%, #dc2f02 100%)';
+      button.style.boxShadow = '0 2px 8px rgba(220, 47, 2, 0.35)';
     }, 3000);
   }
 }
