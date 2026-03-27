@@ -196,26 +196,27 @@
   <div class="header">
     <div>
       <div class="title">Jable Collect</div>
-      <div class="subtitle">快捷控制台</div>
+      <div class="subtitle">Jable / MissAV 快捷控制台</div>
+      <div class="subtitle" id="stats-site">当前统计：Jable</div>
     </div>
     <div class="status-dot" id="status-dot"></div>
   </div>
 
   <div class="stats">
     <div class="stat-card">
-      <div class="stat-label">总视频</div>
+      <div class="stat-label" id="total-label">总视频</div>
       <div class="stat-value" id="total-count">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">双来源</div>
+      <div class="stat-label" id="both-label">双来源</div>
       <div class="stat-value" id="both-count">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">收藏</div>
+      <div class="stat-label" id="favorites-label">收藏</div>
       <div class="stat-value" id="favorites-count">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">稍后观看</div>
+      <div class="stat-label" id="watch-later-label">稍后观看</div>
       <div class="stat-value" id="watch-later-count">0</div>
     </div>
   </div>
@@ -224,7 +225,7 @@
     <div class="panel-title">当前页面</div>
     <div class="page-title" id="page-title">正在检测页面…</div>
     <div class="panel-text" id="page-description">请稍候。</div>
-    <div class="sync-note" id="sync-note">只有在 Jable 收藏页或稍后观看页，才能直接触发同步。</div>
+    <div class="sync-note" id="sync-note">只有在 Jable 收藏页、稍后观看页或 MissAV /saved 页面，才能直接触发同步。</div>
     <div class="actions">
       <button class="btn-primary" id="sync-button" disabled>同步当前页面</button>
       <button class="btn-secondary" id="open-options">打开管理页</button>
