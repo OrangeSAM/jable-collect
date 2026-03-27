@@ -2,129 +2,239 @@
 <html>
 <head>
 <meta charset="utf-8">
+<title>Jable Collect</title>
 <style>
+  :root {
+    --bg: #111215;
+    --panel: #1a1c21;
+    --panel-soft: #22252c;
+    --border: #30343d;
+    --text: #f3f4f6;
+    --muted: #9ca3af;
+    --accent: #f59e0b;
+    --accent-strong: #d97706;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --shadow: rgba(0, 0, 0, 0.28);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
   body {
-    width: 350px;
-    padding: 15px;
+    margin: 0;
+    width: 380px;
+    padding: 16px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
   }
-  
+
+  .shell {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
   .header {
-    text-align: center;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
   }
-  
+
+  .title {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  .status-dot.success { background: var(--success); }
+  .status-dot.error { background: var(--danger); }
+  .status-dot.running { background: var(--accent); }
+
   .stats {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    margin-bottom: 20px;
   }
-  
-  .stat-item {
-    background: #f5f5f5;
-    padding: 10px;
-    border-radius: 6px;
-    text-align: center;
+
+  .stat-card,
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 24px var(--shadow);
   }
-  
-  .stat-number {
-    font-size: 24px;
-    font-weight: bold;
-    color: #333;
+
+  .stat-card {
+    padding: 12px;
   }
-  
+
   .stat-label {
     font-size: 12px;
-    color: #666;
-    margin-top: 4px;
+    color: var(--muted);
   }
-  
+
+  .stat-value {
+    margin-top: 6px;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .panel-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .page-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .panel-text {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .sync-note {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--panel-soft);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
   .actions {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    margin-top: 12px;
   }
-  
-  .btn {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
+
+  button {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 11px 14px;
     font-size: 14px;
-    transition: background-color 0.2s;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
   }
-  
+
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
   .btn-primary {
-    background: #007bff;
-    color: white;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: #111;
   }
-  
-  .btn-primary:hover {
-    background: #0056b3;
-  }
-  
+
   .btn-secondary {
-    background: #6c757d;
-    color: white;
+    background: var(--panel-soft);
+    color: var(--text);
+    border: 1px solid var(--border);
   }
-  
-  .btn-secondary:hover {
-    background: #545b62;
-  }
-  
-  .category-quick-list {
-    max-height: 150px;
-    overflow-y: auto;
-    margin-top: 15px;
-  }
-  
-  .category-quick-item {
+
+  .status-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    border-radius: 4px;
-    margin-bottom: 4px;
-    background: #f8f9fa;
+    flex-direction: column;
+    gap: 6px;
     font-size: 13px;
   }
-  
-  .category-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 8px;
+
+  .status-main {
+    font-weight: 600;
+  }
+
+  .status-meta {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .empty {
+    color: var(--muted);
+    font-size: 13px;
   }
 </style>
 </head>
 <body>
-<div class="header">
-  <h2>收藏分类管理</h2>
-</div>
-
-<div class="stats">
-  <div class="stat-item">
-    <div class="stat-number" id="total-favorites">0</div>
-    <div class="stat-label">总收藏</div>
+<div class="shell">
+  <div class="header">
+    <div>
+      <div class="title">Jable Collect</div>
+      <div class="subtitle">快捷控制台</div>
+    </div>
+    <div class="status-dot" id="status-dot"></div>
   </div>
-  <div class="stat-item">
-    <div class="stat-number" id="total-categories">0</div>
-    <div class="stat-label">分类数</div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">总视频</div>
+      <div class="stat-value" id="total-count">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">双来源</div>
+      <div class="stat-value" id="both-count">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">收藏</div>
+      <div class="stat-value" id="favorites-count">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">稍后观看</div>
+      <div class="stat-value" id="watch-later-count">0</div>
+    </div>
   </div>
-</div>
 
-<div class="actions">
-  <button class="btn btn-primary" id="sync-data">同步收藏2数据</button>
-  <button class="btn btn-secondary" id="manage-categories">管理分类</button>
-  <button class="btn btn-secondary" id="export-favorites">导出收藏</button>
-  <button class="btn btn-secondary" id="open-options">设置选项</button>
-</div>
+  <div class="panel">
+    <div class="panel-title">当前页面</div>
+    <div class="page-title" id="page-title">正在检测页面…</div>
+    <div class="panel-text" id="page-description">请稍候。</div>
+    <div class="sync-note" id="sync-note">只有在 Jable 收藏页或稍后观看页，才能直接触发同步。</div>
+    <div class="actions">
+      <button class="btn-primary" id="sync-button" disabled>同步当前页面</button>
+      <button class="btn-secondary" id="open-options">打开管理页</button>
+    </div>
+  </div>
 
-<div class="category-quick-list" id="category-list">
-  <!-- 分类列表将在这里动态生成 -->
+  <div class="panel">
+    <div class="panel-title">最近同步</div>
+    <div id="sync-status" class="empty">还没有同步记录</div>
+  </div>
 </div>
 
 <script src="popup.js"></script>

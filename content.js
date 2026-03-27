@@ -155,6 +155,24 @@ function sendToBackground(action, data = {}) {
   });
 }
 
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action !== 'triggerSyncFromPopup') return;
+
+  const button = document.getElementById('fetch-fav-videos-btn');
+  if (!button) {
+    sendResponse({ success: false, error: '同步按钮未初始化' });
+    return;
+  }
+
+  if (button.disabled) {
+    sendResponse({ success: false, error: '当前已有同步任务正在运行' });
+    return;
+  }
+
+  handleFetchClick();
+  sendResponse({ success: true });
+});
+
 // 保存视频到 IndexedDB（通过 background.js）
 async function saveVideosToDB(videos) {
   const response = await sendToBackground('syncFavorites', { videos, pageType: pageTypeKey });
@@ -162,6 +180,16 @@ async function saveVideosToDB(videos) {
     throw new Error(response.error);
   }
   return response.count;
+}
+
+function setSyncStatus(status) {
+  chrome.storage.local.set({
+    lastSyncStatus: {
+      ...status,
+      pageType: pageTypeKey,
+      updatedAt: Date.now()
+    }
+  });
 }
 
 // 开始执行
@@ -228,8 +256,19 @@ async function handleFetchClick() {
   button.style.background = 'linear-gradient(135deg, #6c757d 0%, #495057 100%)';
   button.style.boxShadow = 'none';
 
+  setSyncStatus({
+    state: 'running',
+    message: `正在同步${pageType}`
+  });
+
   try {
-    await fetchAllFavoriteVideos();
+    const savedCount = await fetchAllFavoriteVideos();
+
+    setSyncStatus({
+      state: 'success',
+      count: savedCount,
+      message: `成功同步 ${savedCount} 条${pageType}`
+    });
 
     button.textContent = '✅ 获取完成';
     button.style.background = 'linear-gradient(135deg, #2d6a4f 0%, #1b4332 100%)';
@@ -244,6 +283,11 @@ async function handleFetchClick() {
 
   } catch (error) {
     console.error('获取失败:', error);
+
+    setSyncStatus({
+      state: 'error',
+      message: error.message || `同步${pageType}失败`
+    });
 
     button.textContent = '❌ 获取失败';
     button.style.background = 'linear-gradient(135deg, #c92a2a 0%, #a61e1e 100%)';
@@ -286,10 +330,11 @@ async function fetchAllFavoriteVideos() {
     }
 
     // 通过 background.js 保存到 IndexedDB
-    await saveVideosToDB(dataArray);
+    const savedCount = await saveVideosToDB(dataArray);
 
-    console.log(`🎉 所有${pageType}数据获取完成！共 ${dataArray.length} 条已保存到数据库`);
-    showNotification(`已保存 ${dataArray.length} 条${pageType}到本地数据库`);
+    console.log(`🎉 所有${pageType}数据获取完成！共 ${savedCount} 条已保存到数据库`);
+    showNotification(`已保存 ${savedCount} 条${pageType}到本地数据库`);
+    return savedCount;
 
   } catch (error) {
     console.error(`获取${pageType}数据失败:`, error);

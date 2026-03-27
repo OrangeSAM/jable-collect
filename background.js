@@ -123,6 +123,31 @@ async function getVideoCount() {
   });
 }
 
+// 获取统计信息
+async function getVideoStats() {
+  const videos = await getAllVideos();
+
+  let favoritesCount = 0;
+  let watchLaterCount = 0;
+  let bothCount = 0;
+
+  videos.forEach(video => {
+    const inFavorites = video.inFavorites || video.pageType === 'favorites';
+    const inWatchLater = video.inWatchLater || video.pageType === 'watchLater';
+
+    if (inFavorites) favoritesCount++;
+    if (inWatchLater) watchLaterCount++;
+    if (inFavorites && inWatchLater) bothCount++;
+  });
+
+  return {
+    totalCount: videos.length,
+    favoritesCount,
+    watchLaterCount,
+    bothCount
+  };
+}
+
 // 删除视频
 async function deleteVideo(url) {
   await initDB();
@@ -184,6 +209,11 @@ async function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: true, count: videoCount });
         break;
 
+      case 'getVideoStats':
+        const stats = await getVideoStats();
+        sendResponse({ success: true, stats });
+        break;
+
       case 'deleteVideo':
         await deleteVideo(request.url);
         sendResponse({ success: true });
@@ -196,9 +226,9 @@ async function handleMessage(request, sender, sendResponse) {
 
       case 'syncFavorites':
         // 处理来自 content.js 的同步请求
-        await saveVideos(request.videos, request.pageType);
+        const syncedCount = await saveVideos(request.videos, request.pageType);
         const newCount = await getVideoCount();
-        sendResponse({ success: true, count: newCount });
+        sendResponse({ success: true, count: syncedCount, totalCount: newCount });
         break;
 
       default:
