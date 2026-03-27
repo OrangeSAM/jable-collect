@@ -1,71 +1,106 @@
-# Jable Collect Manager
+# Jable Collect
 
-A Chrome extension for managing and organizing video collections from Jable.tv with enhanced classification and search capabilities.
+**Chrome extension for managing Jable.tv + MissAV favorites** — one-click sync, local storage, powerful search.
+
+> Free and open source. All data is stored locally in your browser. Nothing is sent to any server.
+
+---
 
 ## Features
 
-- Export Jable.tv favorite videos to JSON
-- Export "Watch Later" videos
-- Sort videos by content ID (番號)
-- Multi-dimensional search (by content ID, title, category, tags)
-- Display favorite status on video pages
-- Integration with external databases (libredmm.com, javdatabase.com, javlibrary.com)
+- **One-click sync** — Automatically paginates through Jable.tv favorites/watch-later lists and MissAV `/saved` pages
+- **Local IndexedDB storage** — Data persists in your browser even after closing; no cloud required
+- **Dual-site support** — Jable and MissAV data are stored in separate isolated stores
+- **Smart deduplication** — Videos appearing in both \"Favorites\" and \"Watch Later\" are merged, not duplicated
+- **Search by content ID** — Quickly find videos by ID (e.g. `CAWD-958`) or title keywords
+- **Flexible sorting** — Original order / ID A→Z / ID Z→A
+- **Source filtering** — View All / Favorites only / Watch Later only
+- **Export / Import** — Back up and restore your collection as JSON
+- **Popup dashboard** — Click the extension icon to see stats and trigger sync instantly
+
+---
+
+
 
 ## Installation
 
-1. Clone or download this repository
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" (top right toggle)
-4. Click "Load unpacked"
-5. Select the project folder
+This extension is not yet on the Chrome Web Store. Install manually:
+
+1. **Download the source**
+   - click [*link*](https://github.com/OrangeSAM/jable-collect/releases/tag/v1.0.0) **jable-collect-v1.0.0**，unzip to local
+
+
+2. **Load the extension**
+   - Open Chrome and go to `chrome://extensions/`
+   - Enable **Developer mode** (toggle in the top right)
+   - Click **Load unpacked**
+   - Select the extracted project folder
+
+3. **Done** — the extension icon appears in your toolbar ✓
+
+## Screenshots
+
+![alt text](images/jable-collect-popup.png)
+![alt text](images/jable-collect.png)
+
+---
+
+---
 
 ## Usage
 
-1. Navigate to Jable.tv and log in to your account
-2. Go to your favorites page: `https://jable.tv/my/favourites/videos/`
-3. Click the "获取收藏视频数据" button in the top-right corner
-4. The extension will automatically paginate through all favorites
-5. Data will be exported to `favorite_videos.json` when complete
+### Sync Jable.tv Favorites
+
+1. Log in to your Jable.tv account
+2. Navigate to your favorites: `https://jable.tv/my/favourites/`
+3. Click the extension icon → **「Sync current page」**
+4. The extension auto-paginates through all pages and shows a result when done
+
+### Sync MissAV Favorites
+
+1. Log in to your MissAV account
+2. Navigate to your saved page: `https://missav.ws/saved`
+3. Same as above — click **「Sync current page」**
+
+### Browse Your Collection
+
+- Click the extension icon → **「Open manager」**
+- Search, sort, filter by source, delete entries, or export/import data
+
+---
 
 ## Project Structure
 
 ```
-├── manifest.json      # Chrome extension configuration
-├── content.js        # Content script for favorites page
-├── background.js     # Service worker for background tasks
-├── popup.html/js     # Extension popup UI
-├── options.html/js   # Extension options page
-├── style.css         # Popup styles
-├── images/           # Extension icons (16px, 48px, 128px)
-├── data.json         # Sample data file
-└── test.html         # Test page
+├── manifest.json          # Extension config (Manifest V3)
+├── background.js          # Service worker — IndexedDB read/write
+├── content.js             # Jable.tv content script
+├── content-missav.js      # MissAV content script
+├── popup.html / popup.js  # Quick-action popup
+└── options.html / options.js  # Full collection manager UI
 ```
 
-## Configuration
+---
 
-### Host Permissions
+## FAQ
 
-The extension requires permission to access:
-- `https://jable.tv/*`
+**Q: The sync button is greyed out?**
+A: Sync can only be triggered on supported pages: Jable.tv favorites/watch-later or MissAV `/saved`. Navigate to one of those first.
 
-### Content Script Matching
+**Q: Is my data sent anywhere?**
+A: No. All data lives in your browser's local IndexedDB. Nothing leaves your machine.
 
-Content scripts run on:
-- `https://jable.tv/my/favourites/videos/*`
+**Q: Does it work on Edge / Brave / Firefox?**
+A: Built on Manifest V3, so it works on Chromium-based browsers (Chrome, Edge, Brave). Firefox has not been tested.
 
-## Development
-
-To modify this extension:
-
-1. Edit `content.js` for page interaction logic
-2. Edit `manifest.json` to update permissions or content script matches
-3. Edit `background.js` for service worker logic
-4. Reload the extension in `chrome://extensions/` after changes
-
-## Architecture
-
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed technical documentation including storage implementation, data flow, and dual-source merge mechanism.
+---
 
 ## License
 
-MIT
+MIT — free to use, modify, and distribute.
+
+---
+
+## Contributing & Feedback
+
+Issues and PRs are welcome. If you find it useful, a ⭐ Star goes a long way!

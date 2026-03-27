@@ -1,67 +1,109 @@
-# Jable 收藏管理器
+# Jable Collect
 
-一款 Chrome 扩展，用于管理和整理 Jable.tv 网站的视频收藏，提供增强的分类和搜索功能。
+English version [*click here*](https://github.com/OrangeSAM/jable-collect/blob/main/readme.md)
+
+**Jable.tv + MissAV 收藏管理 Chrome 插件** — 一键同步、本地存储、强大检索。
+
+> 免费开源，数据全部保存在本地，不上传任何服务器。
+
+---
 
 ## 功能特性
 
-- 导出 Jable.tv 收藏视频到 JSON 文件
-- 导出"稍后观看"列表视频
-- 按番号排序
-- 多维度搜索（按番号、标题、分类、标签）
-- 在视频页面显示是否已收藏状态
-- 集成外部数据库查询（libredmm.com、javdatabase.com、javlibrary.com）
+- **一键同步收藏** — 自动翻页抓取 Jable.tv 收藏/稍后观看列表，以及 MissAV `/saved` 页面，无需手动操作
+- **本地 IndexedDB 存储** — 数据永久保存在浏览器本地，关闭浏览器也不丢失
+- **双站点隔离** — Jable 和 MissAV 数据分开管理，互不干扰
+- **双来源合并** — 同一视频同时出现在「收藏」和「稍后观看」时自动合并，不重复计数
+- **按番号搜索** — 支持按番号（如 `CAWD-958`）或标题关键词快速检索
+- **灵活排序** — 原始顺序 / 番号 A→Z / 番号 Z→A
+- **来源筛选** — 按「全部 / 收藏 / 稍后观看」分类查看
+- **导出 / 导入** — 支持 JSON 格式备份和恢复数据
+- **弹窗快捷面板** — 点击插件图标即可查看统计数据、触发同步
 
-## 安装步骤
+---
 
-1. 克隆或下载本仓库
-2. 打开 Chrome，访问 `chrome://extensions/`
-3. 启用右上角的"开发者模式"
-4. 点击"加载已解压的扩展程序"
-5. 选择本项目文件夹
+
+
+## 安装方法
+
+由于本插件目前未上架 Chrome Web Store，需手动加载：
+
+1. **下载安装包**
+   - 点击 [*本链接*](https://github.com/OrangeSAM/jable-collect/releases/tag/v1.0.0) **jable-collect-v1.0.0**，解压到本地
+
+2. **加载插件**
+   - 打开 Chrome，地址栏输入 `chrome://extensions/`
+   - 右上角打开 **「开发者模式」**
+   - 点击 **「加载已解压的扩展程序」**
+   - 选择解压后的项目文件夹
+
+3. **完成** — 浏览器工具栏出现插件图标即安装成功 ✓
+
+---
+
+## 截图
+
+![alt text](images/jable-collect-popup.png)
+![alt text](images/jable-collect.png)
+
+---
 
 ## 使用方法
 
-1. 访问 Jable.tv 并登录账号
-2. 进入收藏页面：`https://jable.tv/my/favourites/videos/`
-3. 点击页面右上角的"获取收藏视频数据"按钮
-4. 扩展程序会自动翻页获取所有收藏
-5. 获取完成后自动下载 `favorite_videos.json` 文件
+### 同步 Jable.tv 收藏
+
+1. 登录 Jable.tv 账号
+2. 访问收藏页：`https://jable.tv/my/favourites/`
+3. 点击浏览器右上角插件图标 → **「同步当前页面」**
+4. 插件自动翻页抓取全部收藏，完成后弹窗显示同步结果
+
+### 同步 MissAV 收藏
+
+1. 登录 MissAV 账号
+2. 访问收藏页：`https://missav.ws/saved`
+3. 同上，点击 **「同步当前页面」**
+
+### 管理收藏
+
+- 点击插件图标 → **「打开管理页」**
+- 在管理页可以：搜索、排序、按来源筛选、删除、导出/导入数据
+
+---
 
 ## 项目结构
 
 ```
-├── manifest.json      # Chrome 扩展配置文件
-├── content.js        # 收藏页面的内容脚本
-├── background.js     # 后台 Service Worker
-├── popup.html/js     # 扩展弹窗界面
-├── options.html/js   # 扩展选项页面
-├── style.css         # 弹窗样式
-├── images/           # 扩展图标 (16px, 48px, 128px)
-├── data.json         # 示例数据文件
-└── test.html         # 测试页面
+├── manifest.json        # 插件配置（Manifest V3）
+├── background.js        # Service Worker，负责 IndexedDB 读写
+├── content.js           # Jable.tv 页面内容脚本
+├── content-missav.js    # MissAV 页面内容脚本
+├── popup.html / popup.js    # 弹窗快捷面板
+└── options.html / options.js  # 收藏管理页
 ```
 
-## 配置说明
+---
 
-### 主机权限
+## 常见问题
 
-扩展需要以下网站权限：
-- `https://jable.tv/*`
+**Q: 同步按钮是灰色的，无法点击？**
+A: 只有在 Jable 收藏页、稍后观看页或 MissAV `/saved` 页面时才能触发同步，请先跳转到对应页面。
 
-### 内容脚本匹配
+**Q: 数据会上传到服务器吗？**
+A: 不会。所有数据仅保存在本地浏览器的 IndexedDB 中。
 
-内容脚本会在以下页面运行：
-- `https://jable.tv/my/favourites/videos/*`
+**Q: 支持 Edge / Firefox 吗？**
+A: 基于 Manifest V3 开发，理论上支持 Chromium 系浏览器（Chrome、Edge、Brave 等）。Firefox 暂未测试。
 
-## 开发说明
-
-修改扩展程序：
-
-1. 编辑 `content.js` 修改页面交互逻辑
-2. 编辑 `manifest.json` 更新权限或内容脚本匹配规则
-3. 编辑 `background.js` 修改后台逻辑
-4. 修改后在 `chrome://extensions/` 重新加载扩展
+---
 
 ## 开源协议
 
-MIT
+MIT License — 自由使用、修改、分发。
+
+---
+
+## 贡献 & 反馈
+
+欢迎提 Issue 或 PR！如果觉得好用，请给个 ⭐ Star 支持一下。
+
+
