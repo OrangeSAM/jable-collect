@@ -278,7 +278,7 @@ async function fetchAllFavorites() {
     await getMissavFavorites(page);
 
     if (page < totalPage) {
-      await delay(1500);
+      await delay(3000);
     }
   }
 
