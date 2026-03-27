@@ -175,7 +175,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // 保存视频到 IndexedDB（通过 background.js）
 async function saveVideosToDB(videos) {
-  const response = await sendToBackground('syncFavorites', { videos, pageType: pageTypeKey });
+  const response = await sendToBackground('syncFavorites', {
+    videos,
+    pageType: pageTypeKey,
+    site: 'jable'
+  });
   if (!response.success) {
     throw new Error(response.error);
   }
@@ -186,6 +190,7 @@ function setSyncStatus(status) {
   chrome.storage.local.set({
     lastSyncStatus: {
       ...status,
+      site: 'jable',
       pageType: pageTypeKey,
       updatedAt: Date.now()
     }
