@@ -1,8 +1,8 @@
 {
 "manifest_version": 3,
-"name": "收藏分类管理器",
+"name": "Jable Collect",
 "version": "1.0",
-"description": "为网站收藏功能添加分类管理",
+"description": "抓取、整理和浏览 Jable 收藏与稍后观看数据",
 "permissions": [
   "storage",
   "activeTab",
@@ -23,7 +23,7 @@
 ],
 "action": {
   "default_popup": "popup.html",
-  "default_title": "收藏分类管理"
+  "default_title": "Jable Collect"
 },
 "options_page": "options.html"
 }
