@@ -10,7 +10,8 @@
   "tabs"
 ],
 "host_permissions": [
-  "https://jable.tv/*"
+  "https://jable.tv/*",
+  "https://missav.ws/*"
 ],
 "background": {
   "service_worker": "background.js"
@@ -19,6 +20,13 @@
   {
     "matches": ["https://jable.tv/my/favourites/*"],
     "js": ["content.js"]
+  },
+  {
+    "matches": [
+      "https://missav.ws/saved*",
+      "https://missav.ws/*/saved*"
+    ],
+    "js": ["content-missav.js"]
   }
 ],
 "action": {
