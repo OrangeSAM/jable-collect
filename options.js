@@ -1,12 +1,16 @@
-// ========== 工具函数 ==========
+function getSiteLabel(site = 'jable') {
+  return site === 'missav' ? 'MissAV' : 'Jable';
+}
 
-function hasSource(video, source) {
+function hasSource(video, source, site = 'jable') {
+  if (site === 'missav') {
+    return source === 'all' || source === 'favorites';
+  }
+
   if (source === 'favorites') return video.inFavorites || video.pageType === 'favorites';
   if (source === 'watchLater') return video.inWatchLater || video.pageType === 'watchLater';
   return true;
 }
-
-// ========== 与 background.js 通信 ==========
 
 function sendToBackground(action, data = {}) {
   return new Promise((resolve, reject) => {
@@ -20,32 +24,35 @@ function sendToBackground(action, data = {}) {
   });
 }
 
-async function getAllVideosFromDB() {
-  const response = await sendToBackground('getAllVideos');
+async function getAllVideosFromDB(site) {
+  const response = await sendToBackground('getAllVideos', { site });
   if (!response.success) throw new Error(response.error);
   return response.videos;
 }
 
-async function deleteVideoFromDB(url) {
-  const response = await sendToBackground('deleteVideo', { url });
+async function deleteVideoFromDB(url, site) {
+  const response = await sendToBackground('deleteVideo', { url, site });
   if (!response.success) throw new Error(response.error);
 }
 
-async function clearAllVideosFromDB() {
-  const response = await sendToBackground('clearAllVideos');
+async function clearAllVideosFromDB(site) {
+  const response = await sendToBackground('clearAllVideos', { site });
   if (!response.success) throw new Error(response.error);
 }
 
-async function importVideosToDB(videos) {
-  const response = await sendToBackground('saveVideos', { videos });
+async function importVideosToDB(videos, site) {
+  const response = await sendToBackground('saveVideos', {
+    videos,
+    site,
+    pageType: site === 'jable' ? 'favorites' : 'favorites'
+  });
   if (!response.success) throw new Error(response.error);
   return response.count;
 }
 
-// ========== 页面逻辑 ==========
-
 class OptionsManager {
   constructor() {
+    this.activeSite = 'jable';
     this.allVideos = [];
     this.filteredVideos = [];
     this.currentPage = 1;
@@ -53,25 +60,47 @@ class OptionsManager {
     this.sortField = 'original';
     this.sortOrder = 'asc';
     this.searchKeyword = '';
-    this.sourceFilter = 'all'; // 'all' | 'favorites' | 'watchLater'
+    this.sourceFilter = 'all';
 
     this.init();
   }
 
   async init() {
+    this.cacheElements();
     this.bindEvents();
+    this.renderSiteState();
     await this.loadVideos();
+  }
+
+  cacheElements() {
+    this.siteTitleEl = document.getElementById('site-title');
+    this.siteSubtitleEl = document.getElementById('site-subtitle');
+    this.totalCountEl = document.getElementById('total-count');
+    this.totalCountLabelEl = document.getElementById('total-count-label');
+    this.displayCountEl = document.getElementById('display-count');
+    this.videoListEl = document.getElementById('video-list');
+    this.pageInfoEl = document.getElementById('page-info');
+    this.prevBtnEl = document.getElementById('prev-btn');
+    this.nextBtnEl = document.getElementById('next-btn');
+    this.pageSizeEl = document.getElementById('page-size');
+    this.searchInputEl = document.getElementById('search-input');
+    this.sortSelectEl = document.getElementById('sort-select');
+    this.siteTabsEl = document.getElementById('site-tabs');
+    this.sourceTabsEl = document.getElementById('source-tabs');
+    this.importFileEl = document.getElementById('import-file');
+    this.toastEl = document.getElementById('toast');
   }
 
   async loadVideos() {
     try {
-      this.allVideos = await getAllVideosFromDB();
+      this.showLoading();
+      this.allVideos = await getAllVideosFromDB(this.activeSite);
       this.applyFiltersAndSort();
       this.renderVideoList();
       this.updateStats();
     } catch (error) {
       console.error('加载视频失败:', error);
-      document.getElementById('video-list').innerHTML = `
+      this.videoListEl.innerHTML = `
         <div class="empty-state">
           <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
@@ -83,41 +112,67 @@ class OptionsManager {
     }
   }
 
+  showLoading() {
+    this.videoListEl.innerHTML = `
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+      </div>
+    `;
+  }
+
+  renderSiteState() {
+    this.siteTitleEl.textContent = getSiteLabel(this.activeSite);
+    this.siteSubtitleEl.textContent = this.activeSite === 'missav' ? 'MissAV 收藏管理' : '视频收藏管理';
+    this.totalCountLabelEl.textContent = this.activeSite === 'missav' ? '总收藏' : '总收藏';
+    this.searchInputEl.placeholder = this.activeSite === 'missav' ? '搜索 MissAV 标题或番号...' : '搜索番号或标题...';
+    this.sourceTabsEl.classList.toggle('hidden', this.activeSite === 'missav');
+
+    this.siteTabsEl.querySelectorAll('.site-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.site === this.activeSite);
+    });
+
+    this.sourceTabsEl.querySelectorAll('.source-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.source === this.sourceFilter);
+    });
+  }
+
   applyFiltersAndSort() {
     let base = [...this.allVideos];
 
-    // 来源过滤
-    if (this.sourceFilter !== 'all') {
-      base = base.filter(v => hasSource(v, this.sourceFilter));
+    if (this.activeSite === 'jable' && this.sourceFilter !== 'all') {
+      base = base.filter(video => hasSource(video, this.sourceFilter, this.activeSite));
     }
 
-    // 关键词搜索
     if (this.searchKeyword) {
       const lower = this.searchKeyword.toLowerCase();
-      base = base.filter(v =>
-        (v.videoId && v.videoId.toLowerCase().includes(lower)) ||
-        (v.detailTitle && v.detailTitle.toLowerCase().includes(lower))
+      base = base.filter(video =>
+        (video.videoId && video.videoId.toLowerCase().includes(lower)) ||
+        (video.detailTitle && video.detailTitle.toLowerCase().includes(lower))
       );
     }
 
     this.filteredVideos = base;
 
-    // 排序
     this.filteredVideos.sort((a, b) => {
       if (this.sortField === 'original') {
         return (a.order || 0) - (b.order || 0);
       }
+
       if (this.sortField === 'videoId') {
         const parseId = (id) => {
-          const match = (id || '').match(/^([A-Z]+)-?(\d+)$/i);
-          return match ? [match[1].toUpperCase(), parseInt(match[2], 10)] : ['', 0];
+          const match = (id || '').match(/^([A-Z0-9]+)-?(\d+)$/i);
+          return match ? [match[1].toUpperCase(), parseInt(match[2], 10)] : [(id || '').toUpperCase(), 0];
         };
+
         const [prefixA, numA] = parseId(a.videoId);
         const [prefixB, numB] = parseId(b.videoId);
         const dir = this.sortOrder === 'desc' ? -1 : 1;
+
         if (prefixA !== prefixB) return prefixA.localeCompare(prefixB) * dir;
         return (numA - numB) * dir;
       }
+
       return 0;
     });
 
@@ -134,82 +189,87 @@ class OptionsManager {
     return Math.ceil(this.filteredVideos.length / this.pageSize) || 1;
   }
 
-  formatTime(timestamp) {
-    if (!timestamp) return '未知';
-    const date = new Date(timestamp);
-    return date.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
   getSourceInfo(video) {
-    const inFavorites = hasSource(video, 'favorites');
-    const inWatchLater = hasSource(video, 'watchLater');
+    if (this.activeSite === 'missav') {
+      return { label: 'MissAV', className: 'favorites' };
+    }
+
+    const inFavorites = hasSource(video, 'favorites', this.activeSite);
+    const inWatchLater = hasSource(video, 'watchLater', this.activeSite);
 
     if (inFavorites && inWatchLater) {
       return { label: '双来源', className: 'both' };
     }
+
     if (inWatchLater) {
       return { label: '稍后观看', className: 'watch-later' };
     }
+
     return { label: '收藏', className: 'favorites' };
   }
 
+  getEmptyStateDescription() {
+    if (this.activeSite === 'missav') {
+      return '请到 MissAV 的 /saved 页面同步数据';
+    }
+
+    if (this.sourceFilter === 'watchLater') {
+      return '请到 Jable 稍后观看页面获取数据';
+    }
+
+    return '请到 Jable 收藏页面获取数据';
+  }
+
   renderVideoList() {
-    const container = document.getElementById('video-list');
     const videos = this.getPaginatedVideos();
 
     if (this.filteredVideos.length === 0) {
-      container.innerHTML = `
+      this.videoListEl.innerHTML = `
         <div class="empty-state">
           <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/>
           </svg>
           <h3>暂无收藏</h3>
-          <p>请到 Jable 收藏页面获取数据</p>
+          <p>${this.getEmptyStateDescription()}</p>
         </div>
       `;
       this.updatePagination();
       return;
     }
 
-    container.innerHTML = videos.map(video => {
+    this.videoListEl.innerHTML = videos.map(video => {
       const source = this.getSourceInfo(video);
       return `
-      <div class="video-card" data-url="${video.url || video.detailHref}">
-        <div class="video-thumb">
-          <img src="${video.imgDataSrc || video.imgSrc}" alt="${video.videoId || ''}" loading="lazy">
-          ${video.preview ? `<video class="video-preview" src="${video.preview}" muted loop preload="none"></video>` : ''}
-        </div>
-        <div class="video-content">
-          <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
-          <div class="video-meta">
-            <div class="video-tags">
-              <span class="video-id-tag">${video.videoId || '未知'}</span>
-              <span class="video-source-badge ${source.className}">${source.label}</span>
+        <div class="video-card" data-url="${video.url || video.detailHref}">
+          <div class="video-thumb">
+            <img src="${video.imgDataSrc || video.imgSrc || ''}" alt="${video.videoId || ''}" loading="lazy">
+            ${video.preview ? `<video class="video-preview" src="${video.preview}" muted loop preload="none"></video>` : ''}
+          </div>
+          <div class="video-content">
+            <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
+            <div class="video-meta">
+              <div class="video-tags">
+                <span class="video-id-tag">${video.videoId || '未知'}</span>
+                <span class="video-source-badge ${source.className}">${source.label}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
     }).join('');
 
-    // 绑定 hover preview 事件
-    container.querySelectorAll('.video-card').forEach(card => {
-      const video = card.querySelector('video');
-      if (!video) return;
+    this.videoListEl.querySelectorAll('.video-card').forEach(card => {
+      const preview = card.querySelector('video');
+      if (preview) {
+        card.addEventListener('mouseenter', () => {
+          preview.play().catch(() => {});
+        });
 
-      card.addEventListener('mouseenter', () => {
-        video.play().catch(() => {});
-      });
-
-      card.addEventListener('mouseleave', () => {
-        video.pause();
-        video.currentTime = 0;
-      });
+        card.addEventListener('mouseleave', () => {
+          preview.pause();
+          preview.currentTime = 0;
+        });
+      }
 
       card.addEventListener('click', () => {
         const url = card.dataset.url;
@@ -222,14 +282,14 @@ class OptionsManager {
 
   updatePagination() {
     const totalPages = this.getTotalPages();
-    document.getElementById('page-info').textContent = `${this.currentPage} / ${totalPages}`;
-    document.getElementById('prev-btn').disabled = this.currentPage <= 1;
-    document.getElementById('next-btn').disabled = this.currentPage >= totalPages;
+    this.pageInfoEl.textContent = `${this.currentPage} / ${totalPages}`;
+    this.prevBtnEl.disabled = this.currentPage <= 1;
+    this.nextBtnEl.disabled = this.currentPage >= totalPages;
   }
 
   updateStats() {
-    document.getElementById('total-count').textContent = this.allVideos.length;
-    document.getElementById('display-count').textContent = this.filteredVideos.length;
+    this.totalCountEl.textContent = this.allVideos.length;
+    this.displayCountEl.textContent = this.filteredVideos.length;
   }
 
   refresh() {
@@ -238,10 +298,21 @@ class OptionsManager {
     this.updateStats();
   }
 
+  async setSite(site) {
+    if (!site || site === this.activeSite) return;
+    this.activeSite = site;
+    this.sourceFilter = 'all';
+    this.searchKeyword = '';
+    this.searchInputEl.value = '';
+    this.currentPage = 1;
+    this.renderSiteState();
+    await this.loadVideos();
+  }
+
   setSourceFilter(source) {
+    if (this.activeSite === 'missav') return;
     this.sourceFilter = source;
-    // 更新 tab 样式
-    document.querySelectorAll('#source-tabs .source-tab').forEach(btn => {
+    this.sourceTabsEl.querySelectorAll('.source-tab').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.source === source);
     });
     this.refresh();
@@ -249,7 +320,7 @@ class OptionsManager {
 
   async deleteVideo(url) {
     try {
-      await deleteVideoFromDB(url);
+      await deleteVideoFromDB(url, this.activeSite);
       await this.loadVideos();
       this.showToast('删除成功', 'success');
     } catch (error) {
@@ -292,7 +363,7 @@ class OptionsManager {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `jable-favorites-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `${this.activeSite}-favorites-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
       this.showToast(`已导出 ${videos.length} 条数据`, 'success');
@@ -303,7 +374,7 @@ class OptionsManager {
   }
 
   async importData() {
-    const file = document.getElementById('import-file').files[0];
+    const file = this.importFileEl.files[0];
     if (!file) {
       this.showToast('请选择文件', 'error');
       return;
@@ -317,25 +388,28 @@ class OptionsManager {
         throw new Error('数据格式不正确');
       }
 
-      if (confirm(`将导入 ${videos.length} 条数据，确定继续吗？`)) {
-        await importVideosToDB(videos);
+      if (confirm(`将导入 ${videos.length} 条 ${getSiteLabel(this.activeSite)} 数据，确定继续吗？`)) {
+        await importVideosToDB(videos, this.activeSite);
         await this.loadVideos();
         this.showToast(`成功导入 ${videos.length} 条数据`, 'success');
       }
     } catch (error) {
       console.error('导入失败:', error);
       this.showToast('导入失败: ' + error.message, 'error');
+    } finally {
+      this.importFileEl.value = '';
     }
   }
 
   async clearData() {
-    if (!confirm('确定要清空所有收藏数据吗？此操作不可恢复！')) return;
-    if (!confirm('再次确认：所有数据将被永久删除！')) return;
+    const siteLabel = getSiteLabel(this.activeSite);
+    if (!confirm(`确定要清空 ${siteLabel} 的所有收藏数据吗？此操作不可恢复！`)) return;
+    if (!confirm(`再次确认：${siteLabel} 数据将被永久删除！`)) return;
 
     try {
-      await clearAllVideosFromDB();
+      await clearAllVideosFromDB(this.activeSite);
       await this.loadVideos();
-      this.showToast('已清空所有数据', 'success');
+      this.showToast('已清空当前站点数据', 'success');
     } catch (error) {
       console.error('清空失败:', error);
       this.showToast('清空失败', 'error');
@@ -343,30 +417,36 @@ class OptionsManager {
   }
 
   bindEvents() {
-    document.getElementById('source-tabs').addEventListener('click', (e) => {
-      const btn = e.target.closest('.source-tab');
+    this.siteTabsEl.addEventListener('click', async (event) => {
+      const btn = event.target.closest('.site-tab');
+      if (!btn) return;
+      await this.setSite(btn.dataset.site);
+    });
+
+    this.sourceTabsEl.addEventListener('click', (event) => {
+      const btn = event.target.closest('.source-tab');
       if (btn) this.setSourceFilter(btn.dataset.source);
     });
 
-    document.getElementById('search-input').addEventListener('input', (e) => {
-      this.setSearch(e.target.value);
+    this.searchInputEl.addEventListener('input', (event) => {
+      this.setSearch(event.target.value);
     });
 
-    document.getElementById('sort-select').addEventListener('change', (e) => {
-      const [field, order] = e.target.value.split('-');
+    this.sortSelectEl.addEventListener('change', (event) => {
+      const [field, order] = event.target.value.split('-');
       this.setSort(field, order);
     });
 
-    document.getElementById('prev-btn').addEventListener('click', () => {
+    this.prevBtnEl.addEventListener('click', () => {
       this.setPage(this.currentPage - 1);
     });
 
-    document.getElementById('next-btn').addEventListener('click', () => {
+    this.nextBtnEl.addEventListener('click', () => {
       this.setPage(this.currentPage + 1);
     });
 
-    document.getElementById('page-size').addEventListener('change', (e) => {
-      this.setPageSize(e.target.value);
+    this.pageSizeEl.addEventListener('change', (event) => {
+      this.setPageSize(event.target.value);
     });
 
     document.getElementById('export-data').addEventListener('click', () => {
@@ -374,10 +454,10 @@ class OptionsManager {
     });
 
     document.getElementById('import-data').addEventListener('click', () => {
-      document.getElementById('import-file').click();
+      this.importFileEl.click();
     });
 
-    document.getElementById('import-file').addEventListener('change', () => {
+    this.importFileEl.addEventListener('change', () => {
       this.importData();
     });
 
@@ -387,11 +467,10 @@ class OptionsManager {
   }
 
   showToast(message, type) {
-    const el = document.getElementById('toast');
-    el.textContent = message;
-    el.className = `toast ${type} show`;
+    this.toastEl.textContent = message;
+    this.toastEl.className = `toast ${type} show`;
     setTimeout(() => {
-      el.className = 'toast';
+      this.toastEl.className = 'toast';
     }, 3000);
   }
 }

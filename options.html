@@ -57,7 +57,6 @@
     padding: 32px 24px;
   }
 
-  /* Header */
   .header {
     margin-bottom: 32px;
     padding-bottom: 24px;
@@ -65,6 +64,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
+    gap: 20px;
   }
 
   .header-left h1 {
@@ -109,7 +109,6 @@
     letter-spacing: 1px;
   }
 
-  /* Toolbar */
   .toolbar {
     display: flex;
     justify-content: space-between;
@@ -123,6 +122,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
   }
 
   .toolbar-right {
@@ -203,7 +203,6 @@
     text-align: center;
   }
 
-  /* Video Grid - Grid Layout */
   .video-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -289,6 +288,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
   }
 
   .video-id-tag {
@@ -320,7 +320,6 @@
     letter-spacing: 0.5px;
   }
 
-  /* Empty State */
   .empty-state {
     grid-column: 1 / -1;
     padding: 80px 40px;
@@ -349,7 +348,6 @@
     color: var(--text-dim);
   }
 
-  /* Pagination Bar */
   .pagination-bar {
     display: flex;
     justify-content: center;
@@ -363,7 +361,6 @@
     color: var(--text-dim);
   }
 
-  /* Data Actions */
   .data-actions {
     display: flex;
     justify-content: center;
@@ -371,6 +368,7 @@
     margin-top: 32px;
     padding-top: 24px;
     border-top: 1px solid var(--border);
+    flex-wrap: wrap;
   }
 
   .btn-secondary {
@@ -395,7 +393,6 @@
     background: var(--accent-dim);
   }
 
-  /* Toast */
   .toast {
     position: fixed;
     bottom: 32px;
@@ -426,7 +423,6 @@
     color: white;
   }
 
-  /* Loading */
   .loading {
     grid-column: 1 / -1;
     display: flex;
@@ -458,7 +454,7 @@
     font-size: 13px;
   }
 
-  /* Source filter tabs */
+  .site-tabs,
   .source-tabs {
     display: flex;
     gap: 4px;
@@ -468,6 +464,7 @@
     padding: 4px;
   }
 
+  .site-tab,
   .source-tab {
     padding: 6px 14px;
     border: none;
@@ -484,17 +481,22 @@
     white-space: nowrap;
   }
 
+  .site-tab:hover,
   .source-tab:hover {
     color: var(--text-primary);
     background: var(--bg-hover);
   }
 
+  .site-tab.active,
   .source-tab.active {
     background: var(--accent);
     color: var(--bg-primary);
   }
 
-  /* Source badge on card */
+  .source-tabs.hidden {
+    display: none;
+  }
+
   .video-source-badge {
     font-size: 10px;
     font-family: var(--font-mono);
@@ -523,7 +525,6 @@
     border: 1px solid var(--border);
   }
 
-  /* Responsive */
   @media (max-width: 768px) {
     .header {
       flex-direction: column;
@@ -560,13 +561,13 @@
   <div class="container">
     <header class="header">
       <div class="header-left">
-        <h1>Jable <span>Collection</span></h1>
-        <p>视频收藏管理</p>
+        <h1><span id="site-title">Jable</span> <span>Collection</span></h1>
+        <p id="site-subtitle">视频收藏管理</p>
       </div>
       <div class="header-stats">
         <div class="header-stat">
           <div class="header-stat-value" id="total-count">-</div>
-          <div class="header-stat-label">总收藏</div>
+          <div class="header-stat-label" id="total-count-label">总收藏</div>
         </div>
         <div class="header-stat">
           <div class="header-stat-value" id="display-count">-</div>
@@ -577,6 +578,10 @@
 
     <div class="toolbar">
       <div class="toolbar-left">
+        <div class="site-tabs" id="site-tabs">
+          <button class="site-tab active" data-site="jable">Jable</button>
+          <button class="site-tab" data-site="missav">MissAV</button>
+        </div>
         <div class="source-tabs" id="source-tabs">
           <button class="source-tab active" data-source="all">全部</button>
           <button class="source-tab" data-source="favorites">收藏</button>
