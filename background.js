@@ -1,9 +1,34 @@
 // ========== IndexedDB 数据库操作 ==========
 const DB_NAME = 'jable_collect';
-const DB_VERSION = 2;
-const STORE_NAME = 'videos';
+const DB_VERSION = 3;
+const JABLE_STORE_NAME = 'videos';
+const MISSAV_STORE_NAME = 'missav_videos';
+const DEFAULT_SITE = 'jable';
 
 let db = null;
+
+function normalizeSite(site = DEFAULT_SITE) {
+  return site === 'missav' ? 'missav' : DEFAULT_SITE;
+}
+
+function getStoreName(site = DEFAULT_SITE) {
+  return normalizeSite(site) === 'missav' ? MISSAV_STORE_NAME : JABLE_STORE_NAME;
+}
+
+function createJableStore(database) {
+  const store = database.createObjectStore(JABLE_STORE_NAME, { keyPath: 'url' });
+  store.createIndex('videoId', 'videoId', { unique: false });
+  store.createIndex('title', 'title', { unique: false });
+  store.createIndex('order', 'order', { unique: false });
+  store.createIndex('pageType', 'pageType', { unique: false });
+}
+
+function createMissavStore(database) {
+  const store = database.createObjectStore(MISSAV_STORE_NAME, { keyPath: 'url' });
+  store.createIndex('videoId', 'videoId', { unique: false });
+  store.createIndex('detailTitle', 'detailTitle', { unique: false });
+  store.createIndex('order', 'order', { unique: false });
+}
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -18,13 +43,12 @@ function openDB() {
     request.onupgradeneeded = (event) => {
       const database = event.target.result;
 
-      // 只在 store 不存在时创建
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        const store = database.createObjectStore(STORE_NAME, { keyPath: 'url' });
-        store.createIndex('videoId', 'videoId', { unique: false });
-        store.createIndex('title', 'title', { unique: false });
-        store.createIndex('order', 'order', { unique: false });
-        store.createIndex('pageType', 'pageType', { unique: false });
+      if (!database.objectStoreNames.contains(JABLE_STORE_NAME)) {
+        createJableStore(database);
+      }
+
+      if (!database.objectStoreNames.contains(MISSAV_STORE_NAME)) {
+        createMissavStore(database);
       }
     };
   });
@@ -37,95 +61,157 @@ async function initDB() {
   return db;
 }
 
-// 批量保存视频
-async function saveVideos(videos, pageType = 'favorites') {
-  // 确保 db 已初始化
-  const database = await initDB();
-
-  // 读取现有记录，用于合并来源标记并获取最大 order
-  const existing = await new Promise((resolve, reject) => {
-    const tx = database.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-  const existingMap = new Map(existing.map(v => [v.url, v]));
-  const maxOrder = existing.length > 0 ? Math.max(...existing.map(v => v.order || 0)) : 0;
-  let order = maxOrder;
-
+function readAllFromStore(database, storeName) {
   return new Promise((resolve, reject) => {
-    const tx = database.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-
-    videos.forEach(video => {
-      video.videoId = video.videoId || extractVideoId(video.detailHref || video.url);
-
-      const prev = existingMap.get(video.url);
-      if (prev) {
-        // 已存在：保留原有 order，合并来源标记
-        video.order = prev.order;
-        video.inFavorites = prev.inFavorites;
-        video.inWatchLater = prev.inWatchLater;
-      } else {
-        // 新记录：分配新 order
-        order++;
-        video.order = order;
-        video.inFavorites = false;
-        video.inWatchLater = false;
-      }
-
-      // 根据本次抓取类型打标
-      if (pageType === 'favorites') {
-        video.inFavorites = true;
-      } else if (pageType === 'watchLater') {
-        video.inWatchLater = true;
-      }
-
-      // 保留 pageType 字段（指本次抓取来源，向后兼容）
-      video.pageType = pageType;
-
-      store.put(video);
-    });
-
-    tx.oncomplete = () => resolve(videos.length);
-    tx.onerror = () => {
-      console.error('[background] 保存失败:', tx.error);
-      reject(tx.error);
-    };
-  });
-}
-
-// 获取所有视频
-async function getAllVideos() {
-  await initDB();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
+    const tx = database.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
     const request = store.getAll();
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-// 获取视频数量
-async function getVideoCount() {
-  await initDB();
-
+function countFromStore(database, storeName) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
+    const tx = database.transaction(storeName, 'readonly');
+    const store = tx.objectStore(storeName);
     const request = store.count();
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
+function normalizeJablePageType(pageType = 'favorites') {
+  return pageType === 'watchLater' ? 'watchLater' : 'favorites';
+}
+
+function getMaxOrder(videos) {
+  if (!videos.length) return 0;
+  return Math.max(...videos.map(video => video.order || 0));
+}
+
+// 批量保存视频
+async function saveVideos(videos, pageType = 'favorites', site = DEFAULT_SITE) {
+  const normalizedSite = normalizeSite(site);
+  const database = await initDB();
+
+  if (normalizedSite === 'missav') {
+    return saveMissavVideos(database, videos);
+  }
+
+  return saveJableVideos(database, videos, pageType);
+}
+
+async function saveJableVideos(database, videos, pageType = 'favorites') {
+  const normalizedPageType = normalizeJablePageType(pageType);
+  const existing = await readAllFromStore(database, JABLE_STORE_NAME);
+  const existingMap = new Map(existing.map(video => [video.url, video]));
+  let order = getMaxOrder(existing);
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(JABLE_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(JABLE_STORE_NAME);
+
+    videos.forEach(video => {
+      const nextVideo = {
+        ...video,
+        site: 'jable'
+      };
+
+      nextVideo.videoId = nextVideo.videoId || extractVideoId(nextVideo.detailHref || nextVideo.url, 'jable');
+
+      const prev = existingMap.get(nextVideo.url);
+      if (prev) {
+        nextVideo.order = prev.order;
+        nextVideo.inFavorites = prev.inFavorites;
+        nextVideo.inWatchLater = prev.inWatchLater;
+      } else {
+        order++;
+        nextVideo.order = order;
+        nextVideo.inFavorites = false;
+        nextVideo.inWatchLater = false;
+      }
+
+      if (normalizedPageType === 'favorites') {
+        nextVideo.inFavorites = true;
+      } else {
+        nextVideo.inWatchLater = true;
+      }
+
+      nextVideo.pageType = normalizedPageType;
+      store.put(nextVideo);
+    });
+
+    tx.oncomplete = () => resolve(videos.length);
+    tx.onerror = () => {
+      console.error('[background] 保存 Jable 数据失败:', tx.error);
+      reject(tx.error);
+    };
+  });
+}
+
+async function saveMissavVideos(database, videos) {
+  const existing = await readAllFromStore(database, MISSAV_STORE_NAME);
+  const existingMap = new Map(existing.map(video => [video.url, video]));
+  let order = getMaxOrder(existing);
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(MISSAV_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(MISSAV_STORE_NAME);
+
+    videos.forEach(video => {
+      const nextVideo = {
+        ...video,
+        site: 'missav',
+        pageType: 'favorites'
+      };
+
+      nextVideo.videoId = nextVideo.videoId || extractVideoId(nextVideo.detailHref || nextVideo.url, 'missav');
+
+      const prev = existingMap.get(nextVideo.url);
+      if (prev) {
+        nextVideo.order = prev.order;
+      } else {
+        order++;
+        nextVideo.order = order;
+      }
+
+      store.put(nextVideo);
+    });
+
+    tx.oncomplete = () => resolve(videos.length);
+    tx.onerror = () => {
+      console.error('[background] 保存 MissAV 数据失败:', tx.error);
+      reject(tx.error);
+    };
+  });
+}
+
+// 获取所有视频
+async function getAllVideos(site = DEFAULT_SITE) {
+  const database = await initDB();
+  return readAllFromStore(database, getStoreName(site));
+}
+
+// 获取视频数量
+async function getVideoCount(site = DEFAULT_SITE) {
+  const database = await initDB();
+  return countFromStore(database, getStoreName(site));
+}
+
 // 获取统计信息
-async function getVideoStats() {
-  const videos = await getAllVideos();
+async function getVideoStats(site = DEFAULT_SITE) {
+  const normalizedSite = normalizeSite(site);
+  const videos = await getAllVideos(normalizedSite);
+
+  if (normalizedSite === 'missav') {
+    return {
+      totalCount: videos.length,
+      favoritesCount: videos.length,
+      watchLaterCount: 0,
+      bothCount: 0
+    };
+  }
 
   let favoritesCount = 0;
   let watchLaterCount = 0;
@@ -149,12 +235,13 @@ async function getVideoStats() {
 }
 
 // 删除视频
-async function deleteVideo(url) {
-  await initDB();
+async function deleteVideo(url, site = DEFAULT_SITE) {
+  const database = await initDB();
+  const storeName = getStoreName(site);
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+    const tx = database.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
     const request = store.delete(url);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -162,12 +249,13 @@ async function deleteVideo(url) {
 }
 
 // 清空所有视频
-async function clearAllVideos() {
-  await initDB();
+async function clearAllVideos(site = DEFAULT_SITE) {
+  const database = await initDB();
+  const storeName = getStoreName(site);
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+    const tx = database.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
     const request = store.clear();
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -175,7 +263,19 @@ async function clearAllVideos() {
 }
 
 // 从 URL 提取番号
-function extractVideoId(url) {
+function extractVideoId(url, site = DEFAULT_SITE) {
+  if (!url) return null;
+
+  if (normalizeSite(site) === 'missav') {
+    try {
+      const pathname = new URL(url, 'https://missav.ws').pathname.replace(/\/+$/, '');
+      const segments = pathname.split('/').filter(Boolean);
+      return segments.length ? decodeURIComponent(segments[segments.length - 1]).toUpperCase() : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   const match = url.match(/\/videos\/([^\/]+)\/?$/i);
   return match ? match[1].toUpperCase() : null;
 }
@@ -188,48 +288,55 @@ chrome.runtime.onInstalled.addListener(() => {
 // 监听来自内容脚本或选项页的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   handleMessage(request, sender, sendResponse);
-  return true; // 保持消息通道开放
+  return true;
 });
 
 async function handleMessage(request, sender, sendResponse) {
   try {
     switch (request.action) {
-      case 'saveVideos':
-        const count = await saveVideos(request.videos);
+      case 'saveVideos': {
+        const count = await saveVideos(request.videos, request.pageType, request.site);
         sendResponse({ success: true, count });
         break;
+      }
 
-      case 'getAllVideos':
-        const videos = await getAllVideos();
+      case 'getAllVideos': {
+        const videos = await getAllVideos(request.site);
         sendResponse({ success: true, videos });
         break;
+      }
 
-      case 'getVideoCount':
-        const videoCount = await getVideoCount();
+      case 'getVideoCount': {
+        const videoCount = await getVideoCount(request.site);
         sendResponse({ success: true, count: videoCount });
         break;
+      }
 
-      case 'getVideoStats':
-        const stats = await getVideoStats();
+      case 'getVideoStats': {
+        const stats = await getVideoStats(request.site);
         sendResponse({ success: true, stats });
         break;
+      }
 
-      case 'deleteVideo':
-        await deleteVideo(request.url);
+      case 'deleteVideo': {
+        await deleteVideo(request.url, request.site);
         sendResponse({ success: true });
         break;
+      }
 
-      case 'clearAllVideos':
-        await clearAllVideos();
+      case 'clearAllVideos': {
+        await clearAllVideos(request.site);
         sendResponse({ success: true });
         break;
+      }
 
-      case 'syncFavorites':
-        // 处理来自 content.js 的同步请求
-        const syncedCount = await saveVideos(request.videos, request.pageType);
-        const newCount = await getVideoCount();
+      case 'syncFavorites': {
+        const normalizedSite = normalizeSite(request.site);
+        const syncedCount = await saveVideos(request.videos, request.pageType, normalizedSite);
+        const newCount = await getVideoCount(normalizedSite);
         sendResponse({ success: true, count: syncedCount, totalCount: newCount });
         break;
+      }
 
       default:
         sendResponse({ success: false, error: 'Unknown action' });
