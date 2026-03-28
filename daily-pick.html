@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Daily Pick</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --surface: #141418;
+    --card-bg: #1a1a1f;
+    --gold: #e8a84c;
+    --gold-dim: #b8843a;
+    --text: #f0ece4;
+    --text-dim: #8a8690;
+    --border: #2a2a30;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Sora', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(232, 168, 76, 0.03) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(232, 168, 76, 0.02) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .header {
+    position: absolute;
+    top: 40px;
+    text-align: center;
+  }
+
+  .header h1 {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 4px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .pick-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    color: var(--text-dim);
+    font-family: 'Sora', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+  }
+
+  .pick-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow:
+      0 0 30px rgba(232, 168, 76, 0.2),
+      inset 0 0 20px rgba(232, 168, 76, 0.05);
+  }
+
+  .pick-btn svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.4s ease;
+  }
+
+  .pick-btn:hover svg {
+    transform: rotate(180deg);
+  }
+
+  /* Overlay */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+
+  .overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .overlay-bg {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(20px);
+  }
+
+  /* Card Container */
+  .card-container {
+    position: relative;
+    width: 340px;
+    height: 480px;
+    perspective: 1200px;
+    z-index: 2;
+  }
+
+  /* The Card */
+  .card {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    cursor: pointer;
+  }
+
+  /* Card Faces */
+  .card-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    backface-visibility: hidden;
+    overflow: hidden;
+  }
+
+  /* Card Back */
+  .card-back {
+    background: linear-gradient(145deg, #1e1e24 0%, #0f0f12 100%);
+    border: 1px solid rgba(232, 168, 76, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .card-back-pattern {
+    width: 80%;
+    height: 80%;
+    border: 1px solid rgba(232, 168, 76, 0.1);
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-back-pattern::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        rgba(232, 168, 76, 0.02) 8px,
+        rgba(232, 168, 76, 0.02) 16px
+      );
+  }
+
+  .card-back-pattern::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(232, 168, 76, 0.08) 0%, transparent 70%);
+  }
+
+  /* Shimmer overlay on back */
+  .card-back-shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(232, 168, 76, 0.8) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    opacity: 0;
+    border-radius: 20px;
+    pointer-events: none;
+  }
+
+  /* Card Front */
+  .card-front {
+    background: var(--surface);
+    border: 1px solid rgba(232, 168, 76, 0.25);
+    transform: rotateY(180deg);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .card-thumb {
+    position: relative;
+    width: 100%;
+    height: 260px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .card-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s ease;
+  }
+
+  .card-thumb::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5) 100%);
+  }
+
+  .card-content {
+    padding: 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card-id {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+
+  .card-title {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+  }
+
+  .card-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(232, 168, 76, 0.12);
+    color: var(--gold);
+    border: 1px solid rgba(232, 168, 76, 0.25);
+  }
+
+  .card-cta {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px;
+    text-align: center;
+    background: rgba(232, 168, 76, 0.06);
+    border-top: 1px solid rgba(232, 168, 76, 0.1);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+  }
+
+  /* Close button */
+  .close-btn {
+    position: fixed;
+    top: 40px;
+    right: 40px;
+    width: 48px;
+    height: 48px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-dim);
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.4s ease;
+    z-index: 101;
+  }
+
+  .close-btn.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .close-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    transform: rotate(90deg);
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 40px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    opacity: 0.6;
+  }
+
+  .hint kbd {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+  }
+
+  /* Loading */
+  .loading {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    z-index: 200;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+  }
+
+  .loading.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ============================================
+     ANIMATION STATES
+     ============================================ */
+
+  /* Floating idle animation */
+  .card.idle {
+    animation: floatIdle 4s ease-in-out infinite;
+  }
+
+  @keyframes floatIdle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* Flip animation - unified: rise + rotate + settle */
+  .card.flipping {
+    animation: cardFlip 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  @keyframes cardFlip {
+    0% {
+      transform: translateY(0) rotateY(0deg);
+    }
+    35% {
+      transform: translateY(-60px) rotateY(0deg);
+      filter: drop-shadow(0 0 40px rgba(232, 168, 76, 0.4));
+    }
+    50% {
+      transform: translateY(-80px) rotateY(90deg);
+      filter: drop-shadow(0 0 80px rgba(232, 168, 76, 0.8));
+    }
+    65% {
+      transform: translateY(-40px) rotateY(180deg);
+      filter: drop-shadow(0 0 60px rgba(232, 168, 76, 0.5));
+    }
+    80% {
+      transform: translateY(-10px) rotateY(180deg);
+      filter: drop-shadow(0 0 30px rgba(232, 168, 76, 0.3));
+    }
+    90% {
+      transform: translateY(5px) rotateY(180deg);
+    }
+    100% {
+      transform: translateY(0) rotateY(180deg);
+      filter: drop-shadow(0 0 25px rgba(232, 168, 76, 0.2));
+    }
+  }
+
+  /* Shimmer during flip */
+  .card.flipping .card-back-shimmer {
+    animation: shimmerMove 1s ease-out forwards;
+  }
+
+  @keyframes shimmerMove {
+    0% { opacity: 0; background-position: -100% center; }
+    30% { opacity: 1; }
+    70% { opacity: 1; background-position: 200% center; }
+    100% { opacity: 0; background-position: 200% center; }
+  }
+
+  /* Revealed state */
+  .card.revealed .card-front {
+    opacity: 1;
+  }
+
+  .card.revealed {
+    transform: rotateY(180deg);
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  @keyframes glowPulse {
+    0%, 100% {
+      filter: drop-shadow(0 0 30px rgba(232, 168, 76, 0.2));
+    }
+    50% {
+      filter: drop-shadow(0 0 50px rgba(232, 168, 76, 0.35));
+    }
+  }
+
+  /* Hover on revealed card */
+  .card.revealed:hover .card-thumb img {
+    transform: scale(1.05);
+  }
+
+  .card.revealed:hover .card-cta {
+    background: rgba(232, 168, 76, 0.12);
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+
+  /* Close animation */
+  .card.closing {
+    animation: closeCard 0.4s ease forwards;
+  }
+
+  @keyframes closeCard {
+    0% { transform: translateY(0) rotateY(180deg); opacity: 1; }
+    100% { transform: translateY(30px) rotateY(180deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="loading" id="loading">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <div class="header">
+    <h1>Daily Pick</h1>
+  </div>
+
+  <button class="pick-btn" id="pickBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7-6-4.6h7.6L12 2z"/>
+    </svg>
+    <span>Reveal Today's Pick</span>
+  </button>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-bg"></div>
+    <div class="card-container">
+      <div class="card idle" id="card">
+        <div class="card-face card-back">
+          <div class="card-back-pattern"></div>
+          <div class="card-back-shimmer"></div>
+        </div>
+        <div class="card-face card-front">
+          <div class="card-thumb">
+            <img src="" alt="" id="cardImg">
+          </div>
+          <div class="card-content">
+            <div class="card-id" id="cardId">JABLE-001</div>
+            <div class="card-title" id="cardTitle">超高质量舞蹈表演 - 精选合集</div>
+            <div class="card-meta">
+              <span class="card-badge">Favorite</span>
+            </div>
+          </div>
+          <div class="card-cta">Click to Open</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="close-btn" id="closeBtn">&times;</button>
+
+  <p class="hint" id="hint">Press <kbd>Space</kbd> to reveal</p>
+
+  <script>
+    const videos = [
+      { id: 'JABLE-247', title: '超高质量舞蹈表演 - 精选合集', img: 'https://picsum.photos/seed/jable1/680/480' },
+      { id: 'JABLE-189', title: '深夜限定 - 可爱系女孩的温柔夜晚', img: 'https://picsum.photos/seed/jable2/680/480' },
+      { id: 'JABLE-302', title: '偶像團體成員獨家 - 首次亮相', img: 'https://picsum.photos/seed/jable3/680/480' },
+      { id: 'JABLE-415', title: '清新校園風 - 畢業季特別篇', img: 'https://picsum.photos/seed/jable4/680/480' },
+      { id: 'JABLE-088', title: '傳說中的泳裝回 - 清涼一夏', img: 'https://picsum.photos/seed/jable5/680/480' },
+    ];
+
+    const loading = document.getElementById('loading');
+    const pickBtn = document.getElementById('pickBtn');
+    const overlay = document.getElementById('overlay');
+    const card = document.getElementById('card');
+    const cardImg = document.getElementById('cardImg');
+    const cardId = document.getElementById('cardId');
+    const cardTitle = document.getElementById('cardTitle');
+    const closeBtn = document.getElementById('closeBtn');
+    const hint = document.getElementById('hint');
+
+    let isRevealed = false;
+
+    document.fonts.ready.then(() => {
+      setTimeout(() => loading.classList.add('hidden'), 300);
+    });
+
+    function getRandomVideo() {
+      return videos[Math.floor(Math.random() * videos.length)];
+    }
+
+    function resetCard() {
+      card.className = 'card idle';
+      card.style.animation = '';
+      isRevealed = false;
+    }
+
+    function revealCard() {
+      if (isRevealed) return;
+
+      const video = getRandomVideo();
+      cardImg.src = video.img;
+      cardId.textContent = video.id;
+      cardTitle.textContent = video.title;
+
+      hint.style.opacity = '0';
+      overlay.classList.add('active');
+      closeBtn.classList.add('visible');
+
+      // Start unified flip animation
+      card.classList.remove('idle');
+      card.classList.add('flipping');
+
+      // After flip completes, show revealed state
+      setTimeout(() => {
+        card.classList.remove('flipping');
+        card.classList.add('revealed');
+        isRevealed = true;
+      }, 1000);
+    }
+
+    function closeCard() {
+      card.classList.remove('idle', 'flipping', 'revealed');
+      card.classList.add('closing');
+
+      overlay.classList.remove('active');
+      closeBtn.classList.remove('visible');
+
+      setTimeout(() => {
+        card.classList.remove('closing');
+        resetCard();
+        hint.style.opacity = '0.6';
+      }, 400);
+    }
+
+    pickBtn.addEventListener('click', revealCard);
+    closeBtn.addEventListener('click', closeCard);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target.classList.contains('overlay-bg')) closeCard();
+    });
+
+    card.addEventListener('click', () => {
+      if (isRevealed) closeCard();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.classList.contains('active')) closeCard();
+      if (e.key === ' ' && !overlay.classList.contains('active')) {
+        e.preventDefault();
+        revealCard();
+      }
+    });
+  </script>
+</body>
+</html>

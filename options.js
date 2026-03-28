@@ -70,6 +70,7 @@ class OptionsManager {
     this.bindEvents();
     this.renderSiteState();
     await this.loadVideos();
+    chrome.runtime.sendMessage({ action: 'trackEvent', eventName: 'options_page_opened' });
   }
 
   cacheElements() {
@@ -307,6 +308,7 @@ class OptionsManager {
     this.currentPage = 1;
     this.renderSiteState();
     await this.loadVideos();
+    chrome.runtime.sendMessage({ action: 'trackEvent', eventName: 'site_switched', properties: { site } });
   }
 
   setSourceFilter(source) {
@@ -367,6 +369,7 @@ class OptionsManager {
       a.click();
       URL.revokeObjectURL(url);
       this.showToast(`已导出 ${videos.length} 条数据`, 'success');
+      chrome.runtime.sendMessage({ action: 'trackEvent', eventName: 'data_exported', properties: { site: this.activeSite, count: videos.length } });
     } catch (error) {
       console.error('导出失败:', error);
       this.showToast('导出失败', 'error');
@@ -392,6 +395,7 @@ class OptionsManager {
         await importVideosToDB(videos, this.activeSite);
         await this.loadVideos();
         this.showToast(`成功导入 ${videos.length} 条数据`, 'success');
+        chrome.runtime.sendMessage({ action: 'trackEvent', eventName: 'data_imported', properties: { site: this.activeSite, count: videos.length } });
       }
     } catch (error) {
       console.error('导入失败:', error);
@@ -410,6 +414,7 @@ class OptionsManager {
       await clearAllVideosFromDB(this.activeSite);
       await this.loadVideos();
       this.showToast('已清空当前站点数据', 'success');
+      chrome.runtime.sendMessage({ action: 'trackEvent', eventName: 'data_cleared', properties: { site: this.activeSite } });
     } catch (error) {
       console.error('清空失败:', error);
       this.showToast('清空失败', 'error');

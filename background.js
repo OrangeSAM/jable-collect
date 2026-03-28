@@ -1,3 +1,35 @@
+// ========== Amplitude 统计 ==========
+const AMPLITUDE_API_KEY = 'd9a3d2b41c190251a9149f056e2e2353';
+
+async function getDeviceId() {
+  const result = await chrome.storage.local.get('amplitude_device_id');
+  if (result.amplitude_device_id) return result.amplitude_device_id;
+  const id = crypto.randomUUID();
+  await chrome.storage.local.set({ amplitude_device_id: id });
+  return id;
+}
+
+async function trackEvent(eventName, properties = {}) {
+  try {
+    const deviceId = await getDeviceId();
+    await fetch('https://api2.amplitude.com/2/httpapi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: AMPLITUDE_API_KEY,
+        events: [{
+          device_id: deviceId,
+          event_type: eventName,
+          event_properties: properties,
+          platform: 'Chrome Extension',
+        }]
+      })
+    });
+  } catch (e) {
+    // 统计失败不影响主流程
+  }
+}
+
 // ========== IndexedDB 数据库操作 ==========
 const DB_NAME = 'jable_collect';
 const DB_VERSION = 3;
@@ -281,8 +313,13 @@ function extractVideoId(url, site = DEFAULT_SITE) {
 }
 
 // ========== 消息处理 ==========
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   initDB();
+  if (details.reason === 'install') {
+    trackEvent('extension_installed');
+  } else if (details.reason === 'update') {
+    trackEvent('extension_updated', { version: chrome.runtime.getManifest().version });
+  }
 });
 
 // 监听来自内容脚本或选项页的消息
@@ -334,7 +371,14 @@ async function handleMessage(request, sender, sendResponse) {
         const normalizedSite = normalizeSite(request.site);
         const syncedCount = await saveVideos(request.videos, request.pageType, normalizedSite);
         const newCount = await getVideoCount(normalizedSite);
+        trackEvent('sync_completed', { site: normalizedSite, synced_count: syncedCount, total_count: newCount });
         sendResponse({ success: true, count: syncedCount, totalCount: newCount });
+        break;
+      }
+
+      case 'trackEvent': {
+        trackEvent(request.eventName, request.properties || {});
+        sendResponse({ success: true });
         break;
       }
 

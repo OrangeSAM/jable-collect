@@ -289,6 +289,8 @@ async function handleFetchClick() {
   } catch (error) {
     console.error('获取失败:', error);
 
+    chrome.runtime.sendMessage({ action: 'trackEvent', eventName: 'sync_failed', properties: { site: 'jable', error: error.message } });
+
     setSyncStatus({
       state: 'error',
       message: error.message || `同步${pageType}失败`
