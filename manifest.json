@@ -1,7 +1,7 @@
 {
 "manifest_version": 3,
 "name": "Jable Collect",
-"version": "1.0",
+"version": "1.0.1",
 "description": "抓取、整理和浏览 Jable 收藏与稍后观看数据",
 "permissions": [
   "storage",
@@ -22,11 +22,22 @@
     "js": ["content.js"]
   },
   {
+    "matches": ["https://jable.tv/videos/*"],
+    "js": ["content-jable-detail.js"],
+    "run_at": "document_start"
+  },
+  {
     "matches": [
       "https://missav.ws/saved*",
       "https://missav.ws/*/saved*"
     ],
     "js": ["content-missav.js"]
+  }
+],
+"web_accessible_resources": [
+  {
+    "resources": ["content-jable-detail-hook.js"],
+    "matches": ["https://jable.tv/*"]
   }
 ],
 "action": {

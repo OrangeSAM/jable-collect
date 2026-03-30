@@ -26,11 +26,9 @@ async function trackEvent(eventName, properties = {}) {
       })
     });
   } catch (e) {
-    // 统计失败不影响主流程
   }
 }
 
-// ========== IndexedDB 数据库操作 ==========
 const DB_NAME = 'jable_collect';
 const DB_VERSION = 3;
 const JABLE_STORE_NAME = 'videos';
@@ -117,18 +115,93 @@ function normalizeJablePageType(pageType = 'favorites') {
   return pageType === 'watchLater' ? 'watchLater' : 'favorites';
 }
 
+function normalizeJableUrl(url) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url, 'https://jable.tv');
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    const normalizedPath = pathname || '/';
+    return normalizedPath === '/' ? `${parsed.origin}/` : `${parsed.origin}${normalizedPath}/`;
+  } catch (error) {
+    return null;
+  }
+}
+
+function isFilledValue(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
+function pickPreferredValue(nextValue, prevValue) {
+  return isFilledValue(nextValue) ? nextValue : prevValue;
+}
+
+function getJableSourceFlags(video = {}) {
+  return {
+    inFavorites: Boolean(video.inFavorites || video.pageType === 'favorites'),
+    inWatchLater: Boolean(video.inWatchLater || video.pageType === 'watchLater')
+  };
+}
+
+function resolveJablePageType(inFavorites, inWatchLater, fallback = 'favorites') {
+  if (inFavorites && !inWatchLater) return 'favorites';
+  if (inWatchLater && !inFavorites) return 'watchLater';
+  return normalizeJablePageType(fallback);
+}
+
+function prepareJableVideo(video = {}) {
+  const url = normalizeJableUrl(video.url || video.detailHref);
+  const detailHref = normalizeJableUrl(video.detailHref || video.url) || url;
+  const videoId = pickPreferredValue(video.videoId, extractVideoId(detailHref || url, 'jable'));
+
+  return {
+    ...video,
+    site: 'jable',
+    from: video.from || 'jable',
+    url,
+    detailHref,
+    videoId: videoId || null
+  };
+}
+
 function getMaxOrder(videos) {
   if (!videos.length) return 0;
   return Math.max(...videos.map(video => video.order || 0));
 }
 
-// 批量保存视频
+function getMinOrder(videos) {
+  if (!videos.length) return 0;
+  return Math.min(...videos.map(video => video.order || 0));
+}
+
+function clearTransientVideoFields(video = {}) {
+  const nextVideo = { ...video };
+  delete nextVideo._insertAtFront;
+  delete nextVideo._originalUrl;
+  return nextVideo;
+}
+
+function shouldInsertAtFront(pageType = 'favorites', video = {}) {
+  return normalizeJablePageType(pageType) === 'favorites' && video?._insertAtFront === true;
+}
+
+function getNextJableOrder(existingVideos, pageType, prev, incoming) {
+  if (prev) return prev.order;
+  if (shouldInsertAtFront(pageType, incoming)) {
+    return getMinOrder(existingVideos) - 1;
+  }
+  return getMaxOrder(existingVideos) + 1;
+}
+
 async function saveVideos(videos, pageType = 'favorites', site = DEFAULT_SITE) {
   const normalizedSite = normalizeSite(site);
   const database = await initDB();
 
   if (normalizedSite === 'missav') {
-    return saveMissavVideos(database, videos);
+    return saveMissavVideos(database, videos.map(clearTransientVideoFields));
   }
 
   return saveJableVideos(database, videos, pageType);
@@ -137,44 +210,70 @@ async function saveVideos(videos, pageType = 'favorites', site = DEFAULT_SITE) {
 async function saveJableVideos(database, videos, pageType = 'favorites') {
   const normalizedPageType = normalizeJablePageType(pageType);
   const existing = await readAllFromStore(database, JABLE_STORE_NAME);
-  const existingMap = new Map(existing.map(video => [video.url, video]));
-  let order = getMaxOrder(existing);
+  const existingMap = new Map();
+
+  existing.forEach((video) => {
+    const prepared = prepareJableVideo(video);
+    if (!prepared.url) return;
+    existingMap.set(prepared.url, {
+      ...video,
+      ...prepared,
+      _originalUrl: video.url
+    });
+  });
 
   return new Promise((resolve, reject) => {
     const tx = database.transaction(JABLE_STORE_NAME, 'readwrite');
     const store = tx.objectStore(JABLE_STORE_NAME);
+    let savedCount = 0;
 
-    videos.forEach(video => {
-      const nextVideo = {
-        ...video,
-        site: 'jable'
+    videos.forEach((rawVideo) => {
+      const incoming = prepareJableVideo(rawVideo);
+      if (rawVideo?._insertAtFront) {
+        incoming._insertAtFront = true;
+      }
+      if (!incoming.url) return;
+
+      const prev = existingMap.get(incoming.url) || null;
+      const prevPrepared = prev ? prepareJableVideo(prev) : null;
+      const prevFlags = getJableSourceFlags(prev || {});
+      const merged = {
+        ...(prev || {}),
+        ...incoming,
+        site: 'jable',
+        from: incoming.from || prevPrepared?.from || prev?.from || 'jable',
+        url: incoming.url,
+        detailHref: incoming.detailHref || prevPrepared?.detailHref || incoming.url,
+        detailTitle: pickPreferredValue(incoming.detailTitle, prev?.detailTitle) || '',
+        imgSrc: pickPreferredValue(incoming.imgSrc, prev?.imgSrc) || '',
+        imgDataSrc: pickPreferredValue(incoming.imgDataSrc, prev?.imgDataSrc) || '',
+        preview: pickPreferredValue(incoming.preview, prev?.preview) || '',
+        videoId: pickPreferredValue(incoming.videoId, prevPrepared?.videoId || prev?.videoId) || extractVideoId(incoming.url, 'jable')
       };
 
-      nextVideo.videoId = nextVideo.videoId || extractVideoId(nextVideo.detailHref || nextVideo.url, 'jable');
-
-      const prev = existingMap.get(nextVideo.url);
-      if (prev) {
-        nextVideo.order = prev.order;
-        nextVideo.inFavorites = prev.inFavorites;
-        nextVideo.inWatchLater = prev.inWatchLater;
-      } else {
-        order++;
-        nextVideo.order = order;
-        nextVideo.inFavorites = false;
-        nextVideo.inWatchLater = false;
-      }
+      merged.order = getNextJableOrder(existing, normalizedPageType, prev, incoming);
+      merged.inFavorites = prevFlags.inFavorites || incoming.inFavorites === true;
+      merged.inWatchLater = prevFlags.inWatchLater || incoming.inWatchLater === true;
 
       if (normalizedPageType === 'favorites') {
-        nextVideo.inFavorites = true;
+        merged.inFavorites = true;
       } else {
-        nextVideo.inWatchLater = true;
+        merged.inWatchLater = true;
       }
 
-      nextVideo.pageType = normalizedPageType;
-      store.put(nextVideo);
+      merged.pageType = resolveJablePageType(merged.inFavorites, merged.inWatchLater, normalizedPageType);
+
+      const previousKey = prev?._originalUrl || prev?.url;
+      if (previousKey && previousKey !== merged.url) {
+        store.delete(previousKey);
+      }
+
+      store.put(clearTransientVideoFields(merged));
+      existingMap.set(merged.url, clearTransientVideoFields(merged));
+      savedCount++;
     });
 
-    tx.oncomplete = () => resolve(videos.length);
+    tx.oncomplete = () => resolve(savedCount);
     tx.onerror = () => {
       console.error('[background] 保存 Jable 数据失败:', tx.error);
       reject(tx.error);
@@ -219,19 +318,98 @@ async function saveMissavVideos(database, videos) {
   });
 }
 
-// 获取所有视频
+async function saveVideoSource(video, pageType = 'favorites', site = DEFAULT_SITE) {
+  const normalizedSite = normalizeSite(site);
+
+  if (normalizedSite !== 'jable' || normalizeJablePageType(pageType) !== 'favorites') {
+    return saveVideos([video], pageType, normalizedSite);
+  }
+
+  const existingVideos = await getAllVideos(normalizedSite);
+  const normalizedUrl = normalizeJableUrl(video?.url || video?.detailHref);
+  const exists = normalizedUrl
+    ? existingVideos.some((existingVideo) => normalizeJableUrl(existingVideo.url) === normalizedUrl)
+    : false;
+
+  const nextVideo = exists ? video : { ...video, _insertAtFront: true };
+  return saveVideos([nextVideo], pageType, normalizedSite);
+}
+
+async function removeVideoSource(url, pageType = 'favorites', site = DEFAULT_SITE) {
+  const normalizedSite = normalizeSite(site);
+
+  if (normalizedSite === 'missav') {
+    await deleteVideo(url, normalizedSite);
+    return { removed: true, deleted: true };
+  }
+
+  const database = await initDB();
+  const normalizedPageType = normalizeJablePageType(pageType);
+  const normalizedUrl = normalizeJableUrl(url);
+  const existing = await readAllFromStore(database, JABLE_STORE_NAME);
+  const prev = existing.find((video) => normalizeJableUrl(video.url) === normalizedUrl);
+
+  if (!prev) {
+    return { removed: false, deleted: false };
+  }
+
+  const prevPrepared = prepareJableVideo(prev);
+  const nextFlags = getJableSourceFlags(prev);
+
+  if (normalizedPageType === 'favorites') {
+    nextFlags.inFavorites = false;
+  } else {
+    nextFlags.inWatchLater = false;
+  }
+
+  const shouldDelete = !nextFlags.inFavorites && !nextFlags.inWatchLater;
+
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(JABLE_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(JABLE_STORE_NAME);
+
+    const previousKey = prev._originalUrl || prev.url;
+
+    if (shouldDelete) {
+      store.delete(previousKey);
+    } else {
+      const nextVideo = {
+        ...prev,
+        ...prevPrepared,
+        url: normalizedUrl || prevPrepared.url || prev.url,
+        detailHref: normalizeJableUrl(prev.detailHref || prev.url) || normalizedUrl || prev.url,
+        videoId: prev.videoId || prevPrepared.videoId || extractVideoId(normalizedUrl || prev.url, 'jable'),
+        inFavorites: nextFlags.inFavorites,
+        inWatchLater: nextFlags.inWatchLater,
+        pageType: resolveJablePageType(nextFlags.inFavorites, nextFlags.inWatchLater, prev.pageType)
+      };
+
+      if (previousKey !== nextVideo.url) {
+        store.delete(previousKey);
+      }
+
+      delete nextVideo._originalUrl;
+      store.put(nextVideo);
+    }
+
+    tx.oncomplete = () => resolve({ removed: true, deleted: shouldDelete });
+    tx.onerror = () => {
+      console.error('[background] 移除 Jable 来源失败:', tx.error);
+      reject(tx.error);
+    };
+  });
+}
+
 async function getAllVideos(site = DEFAULT_SITE) {
   const database = await initDB();
   return readAllFromStore(database, getStoreName(site));
 }
 
-// 获取视频数量
 async function getVideoCount(site = DEFAULT_SITE) {
   const database = await initDB();
   return countFromStore(database, getStoreName(site));
 }
 
-// 获取统计信息
 async function getVideoStats(site = DEFAULT_SITE) {
   const normalizedSite = normalizeSite(site);
   const videos = await getAllVideos(normalizedSite);
@@ -266,7 +444,6 @@ async function getVideoStats(site = DEFAULT_SITE) {
   };
 }
 
-// 删除视频
 async function deleteVideo(url, site = DEFAULT_SITE) {
   const database = await initDB();
   const storeName = getStoreName(site);
@@ -280,7 +457,6 @@ async function deleteVideo(url, site = DEFAULT_SITE) {
   });
 }
 
-// 清空所有视频
 async function clearAllVideos(site = DEFAULT_SITE) {
   const database = await initDB();
   const storeName = getStoreName(site);
@@ -294,7 +470,6 @@ async function clearAllVideos(site = DEFAULT_SITE) {
   });
 }
 
-// 从 URL 提取番号
 function extractVideoId(url, site = DEFAULT_SITE) {
   if (!url) return null;
 
@@ -308,11 +483,16 @@ function extractVideoId(url, site = DEFAULT_SITE) {
     }
   }
 
-  const match = url.match(/\/videos\/([^\/]+)\/?$/i);
-  return match ? match[1].toUpperCase() : null;
+  try {
+    const pathname = new URL(url, 'https://jable.tv').pathname.replace(/\/+$/, '');
+    const match = pathname.match(/\/videos\/([^\/]+)$/i);
+    return match ? decodeURIComponent(match[1]).toUpperCase() : null;
+  } catch (error) {
+    const match = String(url).match(/\/videos\/([^\/?#]+)\/?/i);
+    return match ? decodeURIComponent(match[1]).toUpperCase() : null;
+  }
 }
 
-// ========== 消息处理 ==========
 chrome.runtime.onInstalled.addListener((details) => {
   initDB();
   if (details.reason === 'install') {
@@ -322,7 +502,6 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// 监听来自内容脚本或选项页的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   handleMessage(request, sender, sendResponse);
   return true;
@@ -334,6 +513,18 @@ async function handleMessage(request, sender, sendResponse) {
       case 'saveVideos': {
         const count = await saveVideos(request.videos, request.pageType, request.site);
         sendResponse({ success: true, count });
+        break;
+      }
+
+      case 'saveVideoSource': {
+        const count = await saveVideoSource(request.video, request.pageType, request.site);
+        sendResponse({ success: true, count });
+        break;
+      }
+
+      case 'removeVideoSource': {
+        const result = await removeVideoSource(request.url, request.pageType, request.site);
+        sendResponse({ success: true, ...result });
         break;
       }
 
