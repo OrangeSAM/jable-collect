@@ -7,8 +7,8 @@ function hasSource(video, source, site = 'jable') {
     return source === 'all' || source === 'favorites';
   }
 
-  if (source === 'favorites') return video.inFavorites || video.pageType === 'favorites';
-  if (source === 'watchLater') return video.inWatchLater || video.pageType === 'watchLater';
+  if (source === 'favorites') return video.inFavorites;
+  if (source === 'watchLater') return video.inWatchLater;
   return true;
 }
 
@@ -160,7 +160,7 @@ class OptionsManager {
       const lower = this.searchKeyword.toLowerCase();
       base = base.filter(video =>
         (video.videoId && video.videoId.toLowerCase().includes(lower)) ||
-        (video.detailTitle && video.detailTitle.toLowerCase().includes(lower))
+        (video.title && video.title.toLowerCase().includes(lower))
       );
     }
 
@@ -168,7 +168,9 @@ class OptionsManager {
 
     this.filteredVideos.sort((a, b) => {
       if (this.sortField === 'original') {
-        return (a.order || 0) - (b.order || 0);
+        const orderA = this.sourceFilter === 'watchLater' ? (a.watchLaterOrder || 0) : (a.favOrder || 0);
+        const orderB = this.sourceFilter === 'watchLater' ? (b.watchLaterOrder || 0) : (b.favOrder || 0);
+        return orderA - orderB;
       }
 
       if (this.sortField === 'videoId') {
@@ -272,7 +274,7 @@ class OptionsManager {
       return '';
     }
 
-    const url = video.url || video.detailHref || '';
+    const url = video.url || '';
     const actions = this.getJableRemovalActions(video);
     if (!url || !actions.length) {
       return '';
@@ -326,13 +328,13 @@ class OptionsManager {
     this.videoListEl.innerHTML = videos.map(video => {
       const source = this.getSourceInfo(video);
       return `
-        <div class="video-card" data-url="${video.url || video.detailHref}">
+        <div class="video-card" data-url="${video.url}">
           <div class="video-thumb">
-            <img src="${video.imgDataSrc || video.imgSrc || ''}" alt="${video.videoId || ''}" loading="lazy">
+            <img src="${video.imgSrc || ''}" alt="${video.videoId || ''}" loading="lazy">
             ${video.preview ? `<video class="video-preview" src="${video.preview}" muted loop preload="none"></video>` : ''}
           </div>
           <div class="video-content">
-            <div class="video-title" title="${video.detailTitle || ''}">${video.detailTitle || '无标题'}</div>
+            <div class="video-title" title="${video.title || ''}">${video.title || '无标题'}</div>
             <div class="video-meta">
               <div class="video-tags">
                 <span class="video-id-tag">${video.videoId || '未知'}</span>

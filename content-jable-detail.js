@@ -218,10 +218,25 @@ function getResolvedPreviewAndImages() {
   };
 }
 
+function getNumericVideoId() {
+  const { imgSrc, imgDataSrc, preview } = getResolvedPreviewAndImages();
+  return firstFilled([
+    extractNumericId(document.querySelector('button[data-video-id]')?.getAttribute('data-video-id')),
+    extractNumericId(document.querySelector('[data-video-id]')?.getAttribute('data-video-id')),
+    extractNumericId(document.querySelector('button[data-id]')?.getAttribute('data-id')),
+    extractNumericId(document.querySelector('[data-id]')?.getAttribute('data-id')),
+    extractNumericId(document.querySelector('input[name="video_id"]')?.value),
+    extractNumericId(document.querySelector('input[name="video_ids[]"]')?.value),
+    extractNumericVideoIdFromAssetUrl(imgSrc),
+    extractNumericVideoIdFromAssetUrl(imgDataSrc),
+    extractNumericVideoIdFromAssetUrl(preview),
+  ]) || null;
+}
+
 function getCurrentVideoMetadata() {
   const url = getCanonicalDetailUrl();
-  const { imgSrc, imgDataSrc, preview } = getResolvedPreviewAndImages();
-  const detailTitle = firstFilled([
+  const { imgSrc, preview } = getResolvedPreviewAndImages();
+  const title = firstFilled([
     normalizeTitle(getMetaContent('meta[property="og:title"]')),
     normalizeTitle(getMetaContent('meta[name="twitter:title"]')),
     normalizeTitle(getText('h1')),
@@ -231,14 +246,11 @@ function getCurrentVideoMetadata() {
 
   return {
     url,
-    detailHref: url,
-    detailTitle,
     videoId: extractVideoId(url),
+    numericId: getNumericVideoId(),
+    title,
     imgSrc,
-    imgDataSrc: imgDataSrc || imgSrc,
     preview,
-    from: JABLE_SITE,
-    site: JABLE_SITE
   };
 }
 
@@ -448,17 +460,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   }
 
   const currentVideo = getCurrentVideoMetadata();
-  const numericVideoId = firstFilled([
-    extractNumericId(document.querySelector('button[data-video-id]')?.getAttribute('data-video-id')),
-    extractNumericId(document.querySelector('[data-video-id]')?.getAttribute('data-video-id')),
-    extractNumericId(document.querySelector('button[data-id]')?.getAttribute('data-id')),
-    extractNumericId(document.querySelector('[data-id]')?.getAttribute('data-id')),
-    extractNumericId(document.querySelector('input[name="video_id"]')?.value),
-    extractNumericId(document.querySelector('input[name="video_ids[]"]')?.value),
-    extractNumericVideoIdFromAssetUrl(currentVideo.imgSrc),
-    extractNumericVideoIdFromAssetUrl(currentVideo.imgDataSrc),
-    extractNumericVideoIdFromAssetUrl(currentVideo.preview)
-  ]);
+  const numericVideoId = currentVideo.numericId;
   if (!numericVideoId) {
     sendResponse({ success: false, error: '当前页面缺少 video_id，无法执行官网删除' });
     return false;

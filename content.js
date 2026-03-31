@@ -113,17 +113,16 @@ function parseJableDomData(html) {
   const data = [];
   videoImgBoxes.forEach(box => {
     const img = box.querySelector('img');
-    const detail = box.querySelector('.detail');
+    const titleAnchor = box.querySelector('.detail .title a');
+    if (!img || !titleAnchor) return;
+    const url = titleAnchor.href;
     const video = {
-      imgSrc: img.src,
-      imgDataSrc: img.dataset.src,
-      preview: img.dataset.preview,
-      detailTitle: detail.querySelector('.title').textContent,
-      detailHref: detail.querySelector('.title a').href,
-      url: detail.querySelector('.title a').href,
-      from: 'jable'
+      imgSrc: img.dataset.src || img.src || '',
+      preview: img.dataset.preview || '',
+      title: (box.querySelector('.detail .title')?.textContent || '').trim(),
+      url,
+      videoId: extractVideoId(url),
     };
-    video.videoId = extractVideoId(video.detailHref);
     data.push(video);
   });
   return data;

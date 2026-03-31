@@ -30,8 +30,8 @@ async function trackEvent(eventName, properties = {}) {
 }
 
 const DB_NAME = 'jable_collect';
-const DB_VERSION = 3;
-const JABLE_STORE_NAME = 'videos';
+const DB_VERSION = 4;
+const JABLE_STORE_NAME = 'jable_videos';
 const MISSAV_STORE_NAME = 'missav_videos';
 const DEFAULT_SITE = 'jable';
 
@@ -46,11 +46,12 @@ function getStoreName(site = DEFAULT_SITE) {
 }
 
 function createJableStore(database) {
-  const store = database.createObjectStore(JABLE_STORE_NAME, { keyPath: 'url' });
-  store.createIndex('videoId', 'videoId', { unique: false });
-  store.createIndex('title', 'title', { unique: false });
-  store.createIndex('order', 'order', { unique: false });
-  store.createIndex('pageType', 'pageType', { unique: false });
+  const store = database.createObjectStore(JABLE_STORE_NAME, { keyPath: 'videoId' });
+  store.createIndex('url', 'url', { unique: true });
+  store.createIndex('inFavorites', 'inFavorites', { unique: false });
+  store.createIndex('inWatchLater', 'inWatchLater', { unique: false });
+  store.createIndex('favOrder', 'favOrder', { unique: false });
+  store.createIndex('watchLaterOrder', 'watchLaterOrder', { unique: false });
 }
 
 function createMissavStore(database) {
@@ -72,6 +73,11 @@ function openDB() {
 
     request.onupgradeneeded = (event) => {
       const database = event.target.result;
+
+      // 删除旧 videos store（v3 及以前），不迁移数据
+      if (database.objectStoreNames.contains('videos')) {
+        database.deleteObjectStore('videos');
+      }
 
       if (!database.objectStoreNames.contains(JABLE_STORE_NAME)) {
         createJableStore(database);
@@ -141,40 +147,30 @@ function pickPreferredValue(nextValue, prevValue) {
 
 function getJableSourceFlags(video = {}) {
   return {
-    inFavorites: Boolean(video.inFavorites || video.pageType === 'favorites'),
-    inWatchLater: Boolean(video.inWatchLater || video.pageType === 'watchLater')
+    inFavorites: Boolean(video.inFavorites),
+    inWatchLater: Boolean(video.inWatchLater)
   };
-}
-
-function resolveJablePageType(inFavorites, inWatchLater, fallback = 'favorites') {
-  if (inFavorites && !inWatchLater) return 'favorites';
-  if (inWatchLater && !inFavorites) return 'watchLater';
-  return normalizeJablePageType(fallback);
 }
 
 function prepareJableVideo(video = {}) {
   const url = normalizeJableUrl(video.url || video.detailHref);
-  const detailHref = normalizeJableUrl(video.detailHref || video.url) || url;
-  const videoId = pickPreferredValue(video.videoId, extractVideoId(detailHref || url, 'jable'));
+  const videoId = pickPreferredValue(video.videoId, extractVideoId(url, 'jable'));
 
   return {
     ...video,
-    site: 'jable',
-    from: video.from || 'jable',
     url,
-    detailHref,
     videoId: videoId || null
   };
 }
 
-function getMaxOrder(videos) {
+function getMaxOrder(videos, field = 'order') {
   if (!videos.length) return 0;
-  return Math.max(...videos.map(video => video.order || 0));
+  return Math.max(...videos.map(video => video[field] || 0));
 }
 
-function getMinOrder(videos) {
+function getMinOrder(videos, field = 'order') {
   if (!videos.length) return 0;
-  return Math.min(...videos.map(video => video.order || 0));
+  return Math.min(...videos.map(video => video[field] || 0));
 }
 
 function clearTransientVideoFields(video = {}) {
@@ -184,16 +180,24 @@ function clearTransientVideoFields(video = {}) {
   return nextVideo;
 }
 
-function shouldInsertAtFront(pageType = 'favorites', video = {}) {
+function shouldInsertAtFront(video = {}) {
   return video?._insertAtFront === true;
 }
 
-function getNextJableOrder(existingVideos, pageType, prev, incoming) {
-  if (prev) return prev.order;
-  if (shouldInsertAtFront(pageType, incoming)) {
-    return getMinOrder(existingVideos) - 1;
+function getNextJableFavOrder(existingVideos, prev, incoming) {
+  if (prev?.favOrder != null) return prev.favOrder;
+  if (shouldInsertAtFront(incoming)) {
+    return getMinOrder(existingVideos, 'favOrder') - 1;
   }
-  return getMaxOrder(existingVideos) + 1;
+  return getMaxOrder(existingVideos, 'favOrder') + 1;
+}
+
+function getNextJableWatchLaterOrder(existingVideos, prev, incoming) {
+  if (prev?.watchLaterOrder != null) return prev.watchLaterOrder;
+  if (shouldInsertAtFront(incoming)) {
+    return getMinOrder(existingVideos, 'watchLaterOrder') - 1;
+  }
+  return getMaxOrder(existingVideos, 'watchLaterOrder') + 1;
 }
 
 async function saveVideos(videos, pageType = 'favorites', site = DEFAULT_SITE) {
@@ -214,12 +218,8 @@ async function saveJableVideos(database, videos, pageType = 'favorites') {
 
   existing.forEach((video) => {
     const prepared = prepareJableVideo(video);
-    if (!prepared.url) return;
-    existingMap.set(prepared.url, {
-      ...video,
-      ...prepared,
-      _originalUrl: video.url
-    });
+    if (!prepared.videoId) return;
+    existingMap.set(prepared.videoId, { ...video, ...prepared });
   });
 
   return new Promise((resolve, reject) => {
@@ -229,47 +229,35 @@ async function saveJableVideos(database, videos, pageType = 'favorites') {
 
     videos.forEach((rawVideo) => {
       const incoming = prepareJableVideo(rawVideo);
-      if (rawVideo?._insertAtFront) {
-        incoming._insertAtFront = true;
-      }
-      if (!incoming.url) return;
+      if (rawVideo?._insertAtFront) incoming._insertAtFront = true;
+      if (!incoming.videoId) return;
 
-      const prev = existingMap.get(incoming.url) || null;
-      const prevPrepared = prev ? prepareJableVideo(prev) : null;
+      const prev = existingMap.get(incoming.videoId) || null;
       const prevFlags = getJableSourceFlags(prev || {});
+
       const merged = {
         ...(prev || {}),
         ...incoming,
-        site: 'jable',
-        from: incoming.from || prevPrepared?.from || prev?.from || 'jable',
-        url: incoming.url,
-        detailHref: incoming.detailHref || prevPrepared?.detailHref || incoming.url,
-        detailTitle: pickPreferredValue(incoming.detailTitle, prev?.detailTitle) || '',
+        url: incoming.url || prev?.url,
+        title: pickPreferredValue(incoming.title, prev?.title) || '',
         imgSrc: pickPreferredValue(incoming.imgSrc, prev?.imgSrc) || '',
-        imgDataSrc: pickPreferredValue(incoming.imgDataSrc, prev?.imgDataSrc) || '',
         preview: pickPreferredValue(incoming.preview, prev?.preview) || '',
-        videoId: pickPreferredValue(incoming.videoId, prevPrepared?.videoId || prev?.videoId) || extractVideoId(incoming.url, 'jable')
+        numericId: pickPreferredValue(incoming.numericId, prev?.numericId) || null,
+        addedAt: prev?.addedAt || Date.now(),
+        inFavorites: prevFlags.inFavorites || incoming.inFavorites === true,
+        inWatchLater: prevFlags.inWatchLater || incoming.inWatchLater === true,
       };
-
-      merged.order = getNextJableOrder(existing, normalizedPageType, prev, incoming);
-      merged.inFavorites = prevFlags.inFavorites || incoming.inFavorites === true;
-      merged.inWatchLater = prevFlags.inWatchLater || incoming.inWatchLater === true;
 
       if (normalizedPageType === 'favorites') {
         merged.inFavorites = true;
+        merged.favOrder = getNextJableFavOrder(existing, prev, incoming);
       } else {
         merged.inWatchLater = true;
-      }
-
-      merged.pageType = resolveJablePageType(merged.inFavorites, merged.inWatchLater, normalizedPageType);
-
-      const previousKey = prev?._originalUrl || prev?.url;
-      if (previousKey && previousKey !== merged.url) {
-        store.delete(previousKey);
+        merged.watchLaterOrder = getNextJableWatchLaterOrder(existing, prev, incoming);
       }
 
       store.put(clearTransientVideoFields(merged));
-      existingMap.set(merged.url, clearTransientVideoFields(merged));
+      existingMap.set(merged.videoId, clearTransientVideoFields(merged));
       savedCount++;
     });
 
@@ -325,10 +313,10 @@ async function saveVideoSource(video, pageType = 'favorites', site = DEFAULT_SIT
     return saveVideos([video], pageType, normalizedSite);
   }
 
+  const prepared = prepareJableVideo(video);
   const existingVideos = await getAllVideos(normalizedSite);
-  const normalizedUrl = normalizeJableUrl(video?.url || video?.detailHref);
-  const exists = normalizedUrl
-    ? existingVideos.some((existingVideo) => normalizeJableUrl(existingVideo.url) === normalizedUrl)
+  const exists = prepared.videoId
+    ? existingVideos.some((v) => v.videoId === prepared.videoId)
     : false;
 
   const nextVideo = exists ? video : { ...video, _insertAtFront: true };
@@ -353,7 +341,6 @@ async function removeVideoSource(url, pageType = 'favorites', site = DEFAULT_SIT
     return { removed: false, deleted: false };
   }
 
-  const prevPrepared = prepareJableVideo(prev);
   const nextFlags = getJableSourceFlags(prev);
 
   if (normalizedPageType === 'favorites') {
@@ -368,28 +355,14 @@ async function removeVideoSource(url, pageType = 'favorites', site = DEFAULT_SIT
     const tx = database.transaction(JABLE_STORE_NAME, 'readwrite');
     const store = tx.objectStore(JABLE_STORE_NAME);
 
-    const previousKey = prev._originalUrl || prev.url;
-
     if (shouldDelete) {
-      store.delete(previousKey);
+      store.delete(prev.videoId);
     } else {
-      const nextVideo = {
+      store.put({
         ...prev,
-        ...prevPrepared,
-        url: normalizedUrl || prevPrepared.url || prev.url,
-        detailHref: normalizeJableUrl(prev.detailHref || prev.url) || normalizedUrl || prev.url,
-        videoId: prev.videoId || prevPrepared.videoId || extractVideoId(normalizedUrl || prev.url, 'jable'),
         inFavorites: nextFlags.inFavorites,
         inWatchLater: nextFlags.inWatchLater,
-        pageType: resolveJablePageType(nextFlags.inFavorites, nextFlags.inWatchLater, prev.pageType)
-      };
-
-      if (previousKey !== nextVideo.url) {
-        store.delete(previousKey);
-      }
-
-      delete nextVideo._originalUrl;
-      store.put(nextVideo);
+      });
     }
 
     tx.oncomplete = () => resolve({ removed: true, deleted: shouldDelete });
@@ -428,12 +401,9 @@ async function getVideoStats(site = DEFAULT_SITE) {
   let bothCount = 0;
 
   videos.forEach(video => {
-    const inFavorites = video.inFavorites || video.pageType === 'favorites';
-    const inWatchLater = video.inWatchLater || video.pageType === 'watchLater';
-
-    if (inFavorites) favoritesCount++;
-    if (inWatchLater) watchLaterCount++;
-    if (inFavorites && inWatchLater) bothCount++;
+    if (video.inFavorites) favoritesCount++;
+    if (video.inWatchLater) watchLaterCount++;
+    if (video.inFavorites && video.inWatchLater) bothCount++;
   });
 
   return {
