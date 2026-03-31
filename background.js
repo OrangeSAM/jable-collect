@@ -30,7 +30,7 @@ async function trackEvent(eventName, properties = {}) {
 }
 
 const DB_NAME = 'jable_collect';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const JABLE_STORE_NAME = 'jable_videos';
 const MISSAV_STORE_NAME = 'missav_videos';
 const DEFAULT_SITE = 'jable';
@@ -52,6 +52,7 @@ function createJableStore(database) {
   store.createIndex('inWatchLater', 'inWatchLater', { unique: false });
   store.createIndex('favOrder', 'favOrder', { unique: false });
   store.createIndex('watchLaterOrder', 'watchLaterOrder', { unique: false });
+  store.createIndex('coverImg', 'coverImg', { unique: false });
 }
 
 function createMissavStore(database) {
@@ -81,6 +82,13 @@ function openDB() {
 
       if (!database.objectStoreNames.contains(JABLE_STORE_NAME)) {
         createJableStore(database);
+      } else {
+        const tx = event.target.transaction;
+        const store = tx.objectStore(JABLE_STORE_NAME);
+        // v4 → v5: 为已有 store 补建 coverImg index
+        if (!store.indexNames.contains('coverImg')) {
+          store.createIndex('coverImg', 'coverImg', { unique: false });
+        }
       }
 
       if (!database.objectStoreNames.contains(MISSAV_STORE_NAME)) {
@@ -222,12 +230,18 @@ async function saveJableVideos(database, videos, pageType = 'favorites') {
     existingMap.set(prepared.videoId, { ...video, ...prepared });
   });
 
+  // Use running counters so each new video gets a unique order value
+  let nextFavOrder = getMaxOrder(existing, 'favOrder') + 1;
+  let nextWatchLaterOrder = getMaxOrder(existing, 'watchLaterOrder') + 1;
+  let minFavOrder = getMinOrder(existing, 'favOrder') - 1;
+  let minWatchLaterOrder = getMinOrder(existing, 'watchLaterOrder') - 1;
+
   return new Promise((resolve, reject) => {
     const tx = database.transaction(JABLE_STORE_NAME, 'readwrite');
     const store = tx.objectStore(JABLE_STORE_NAME);
     let savedCount = 0;
 
-    videos.forEach((rawVideo) => {
+    videos.forEach((rawVideo, index) => {
       const incoming = prepareJableVideo(rawVideo);
       if (rawVideo?._insertAtFront) incoming._insertAtFront = true;
       if (!incoming.videoId) return;
@@ -242,6 +256,7 @@ async function saveJableVideos(database, videos, pageType = 'favorites') {
         title: pickPreferredValue(incoming.title, prev?.title) || '',
         imgSrc: pickPreferredValue(incoming.imgSrc, prev?.imgSrc) || '',
         preview: pickPreferredValue(incoming.preview, prev?.preview) || '',
+        coverImg: pickPreferredValue(incoming.coverImg, prev?.coverImg) || '',
         numericId: pickPreferredValue(incoming.numericId, prev?.numericId) || null,
         addedAt: prev?.addedAt || Date.now(),
         inFavorites: prevFlags.inFavorites || incoming.inFavorites === true,
@@ -250,10 +265,22 @@ async function saveJableVideos(database, videos, pageType = 'favorites') {
 
       if (normalizedPageType === 'favorites') {
         merged.inFavorites = true;
-        merged.favOrder = getNextJableFavOrder(existing, prev, incoming);
+        if (prev?.favOrder != null) {
+          merged.favOrder = prev.favOrder;
+        } else if (shouldInsertAtFront(incoming)) {
+          merged.favOrder = minFavOrder--;
+        } else {
+          merged.favOrder = nextFavOrder++;
+        }
       } else {
         merged.inWatchLater = true;
-        merged.watchLaterOrder = getNextJableWatchLaterOrder(existing, prev, incoming);
+        if (prev?.watchLaterOrder != null) {
+          merged.watchLaterOrder = prev.watchLaterOrder;
+        } else if (shouldInsertAtFront(incoming)) {
+          merged.watchLaterOrder = minWatchLaterOrder--;
+        } else {
+          merged.watchLaterOrder = nextWatchLaterOrder++;
+        }
       }
 
       store.put(clearTransientVideoFields(merged));

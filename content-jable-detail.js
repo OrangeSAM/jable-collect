@@ -96,6 +96,11 @@ function getCanonicalDetailUrl() {
   return normalizeJableUrl(canonicalHref || window.location.href);
 }
 
+function deriveCoverImgFromPreview(previewUrl) {
+  if (!previewUrl) return '';
+  return previewUrl.replace(/\/(\d+)\/\1_preview\.mp4/i, '/$1/preview.jpg');
+}
+
 function derivePreviewFromImage(imageUrl) {
   if (!imageUrl) return '';
 
@@ -251,6 +256,7 @@ function getCurrentVideoMetadata() {
     title,
     imgSrc,
     preview,
+    coverImg: deriveCoverImgFromPreview(preview),
   };
 }
 

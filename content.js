@@ -116,12 +116,15 @@ function parseJableDomData(html) {
     const titleAnchor = box.querySelector('.detail .title a');
     if (!img || !titleAnchor) return;
     const url = titleAnchor.href;
+    const preview = img.dataset.preview || '';
     const video = {
       imgSrc: img.dataset.src || img.src || '',
-      preview: img.dataset.preview || '',
+      preview,
+      coverImg: deriveCoverImgFromPreview(preview),
       title: (box.querySelector('.detail .title')?.textContent || '').trim(),
       url,
       videoId: extractVideoId(url),
+      numericId: extractNumericIdFromPreview(preview),
     };
     data.push(video);
   });
@@ -132,6 +135,19 @@ function parseJableDomData(html) {
 function extractVideoId(url) {
   const match = url.match(/\/videos\/([^\/]+)\/?$/i);
   return match ? match[1].toUpperCase() : null;
+}
+
+// 从 preview URL 提取 Jable 内部纯数字 ID
+function extractNumericIdFromPreview(previewUrl) {
+  if (!previewUrl) return null;
+  const match = previewUrl.match(/\/(\d+)\/\1_preview\.mp4/i);
+  return match ? match[1] : null;
+}
+
+// 从 preview URL 推导封面原图 URL
+function deriveCoverImgFromPreview(previewUrl) {
+  if (!previewUrl) return '';
+  return previewUrl.replace(/\/(\d+)\/\1_preview\.mp4/i, '/$1/preview.jpg');
 }
 
 // ========== 与 background.js 通信 ==========
