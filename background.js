@@ -185,7 +185,7 @@ function clearTransientVideoFields(video = {}) {
 }
 
 function shouldInsertAtFront(pageType = 'favorites', video = {}) {
-  return normalizeJablePageType(pageType) === 'favorites' && video?._insertAtFront === true;
+  return video?._insertAtFront === true;
 }
 
 function getNextJableOrder(existingVideos, pageType, prev, incoming) {
@@ -321,7 +321,7 @@ async function saveMissavVideos(database, videos) {
 async function saveVideoSource(video, pageType = 'favorites', site = DEFAULT_SITE) {
   const normalizedSite = normalizeSite(site);
 
-  if (normalizedSite !== 'jable' || normalizeJablePageType(pageType) !== 'favorites') {
+  if (normalizedSite !== 'jable') {
     return saveVideos([video], pageType, normalizedSite);
   }
 
