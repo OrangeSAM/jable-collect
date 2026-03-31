@@ -168,9 +168,17 @@ class OptionsManager {
 
     this.filteredVideos.sort((a, b) => {
       if (this.sortField === 'original') {
-        const orderA = this.sourceFilter === 'watchLater' ? (a.watchLaterOrder || 0) : (a.favOrder || 0);
-        const orderB = this.sourceFilter === 'watchLater' ? (b.watchLaterOrder || 0) : (b.favOrder || 0);
-        return orderA - orderB;
+        const getOrder = (video) => {
+          if (this.sourceFilter === 'watchLater') return video.watchLaterOrder || 0;
+          if (this.sourceFilter === 'all') {
+            // 优先用收藏顺序，其次用稍后观看顺序，都没有则 0
+            if (video.favOrder != null) return video.favOrder;
+            if (video.watchLaterOrder != null) return video.watchLaterOrder;
+            return 0;
+          }
+          return video.favOrder || 0;
+        };
+        return getOrder(a) - getOrder(b);
       }
 
       if (this.sortField === 'videoId') {
