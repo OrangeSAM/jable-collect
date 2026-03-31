@@ -13,6 +13,8 @@ FILES=(
   background.js
   content.js
   content-missav.js
+  content-jable-detail.js
+  content-jable-detail-hook.js
   popup.html
   popup.js
   options.html
