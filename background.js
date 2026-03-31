@@ -493,6 +493,147 @@ function extractVideoId(url, site = DEFAULT_SITE) {
   }
 }
 
+function queryTabs(queryOptions) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query(queryOptions, (tabs) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(tabs || []);
+    });
+  });
+}
+
+function createTab(createProperties) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create(createProperties, (tab) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(tab);
+    });
+  });
+}
+
+function sendMessageToTab(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+function waitForTabComplete(tabId, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(handleUpdated);
+      reject(new Error('打开 Jable 详情页超时'));
+    }, timeoutMs);
+
+    function finish(result) {
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(handleUpdated);
+      resolve(result);
+    }
+
+    function handleUpdated(updatedTabId, changeInfo, tab) {
+      if (updatedTabId !== tabId) {
+        return;
+      }
+      if (changeInfo.status === 'complete') {
+        finish(tab);
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(handleUpdated);
+    chrome.tabs.get(tabId, (tab) => {
+      if (chrome.runtime.lastError) {
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(handleUpdated);
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      if (tab?.status === 'complete') {
+        finish(tab);
+      }
+    });
+  });
+}
+
+function isJableDetailTab(tab, normalizedUrl) {
+  if (!tab?.id || !tab.url) {
+    return false;
+  }
+  return normalizeJableUrl(tab.url) === normalizedUrl;
+}
+
+async function findOrCreateJableDetailTab(normalizedUrl) {
+  const existingTabs = await queryTabs({ url: 'https://jable.tv/videos/*' });
+  const matchedTab = existingTabs.find((tab) => isJableDetailTab(tab, normalizedUrl));
+  if (matchedTab) {
+    return { tab: matchedTab, created: false };
+  }
+
+  const createdTab = await createTab({ url: normalizedUrl, active: false });
+  if (!createdTab?.id) {
+    throw new Error('无法打开 Jable 详情页');
+  }
+
+  await waitForTabComplete(createdTab.id);
+  return { tab: createdTab, created: true };
+}
+
+async function removeJableVideoSourceRemotely(url, pageType = 'favorites', site = DEFAULT_SITE) {
+  const normalizedSite = normalizeSite(site);
+  if (normalizedSite !== 'jable') {
+    throw new Error('仅支持 Jable 官网删除');
+  }
+
+  const normalizedUrl = normalizeJableUrl(url);
+  if (!normalizedUrl) {
+    throw new Error('无效的 Jable 视频链接');
+  }
+
+  const normalizedPageType = normalizeJablePageType(pageType);
+  // fav_type=0 → 收藏，fav_type=1 → 稍后观看
+  const favType = normalizedPageType === 'watchLater' ? '1' : '0';
+
+  const { tab, created } = await findOrCreateJableDetailTab(normalizedUrl);
+  if (!tab?.id) {
+    throw new Error('找不到 Jable 详情页标签页');
+  }
+
+  try {
+    const response = await sendMessageToTab(tab.id, {
+      action: 'removeVideoSourceFromWebsite',
+      url: normalizedUrl,
+      favType,
+      pageType: normalizedPageType,
+      site: 'jable'
+    });
+
+    if (!response?.success) {
+      throw new Error(response?.error || 'Jable 官网删除失败');
+    }
+  } finally {
+    if (created) {
+      chrome.tabs.remove(tab.id);
+    }
+  }
+
+  return {
+    completed: true,
+    pageType: normalizedPageType,
+    url: normalizedUrl
+  };
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   initDB();
   if (details.reason === 'install') {
@@ -524,6 +665,12 @@ async function handleMessage(request, sender, sendResponse) {
 
       case 'removeVideoSource': {
         const result = await removeVideoSource(request.url, request.pageType, request.site);
+        sendResponse({ success: true, ...result });
+        break;
+      }
+
+      case 'removeJableVideoSourceRemotely': {
+        const result = await removeJableVideoSourceRemotely(request.url, request.pageType, request.site);
         sendResponse({ success: true, ...result });
         break;
       }

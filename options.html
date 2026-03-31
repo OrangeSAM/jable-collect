@@ -264,6 +264,9 @@
 
   .video-content {
     padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .video-title {
@@ -282,6 +285,43 @@
     display: flex;
     justify-content: flex-start;
     align-items: center;
+  }
+
+  .video-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: auto;
+  }
+
+  .video-remove-btn {
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(217, 83, 79, 0.35);
+    background: rgba(217, 83, 79, 0.08);
+    color: #f2b8b6;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .video-remove-btn:hover:not(:disabled) {
+    background: rgba(217, 83, 79, 0.16);
+    border-color: rgba(217, 83, 79, 0.55);
+    color: #ffd2cf;
+  }
+
+  .video-remove-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .video-remove-btn.pending {
+    background: rgba(232, 168, 76, 0.12);
+    border-color: rgba(232, 168, 76, 0.35);
+    color: var(--accent);
   }
 
   .video-tags {

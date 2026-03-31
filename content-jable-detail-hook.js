@@ -1,6 +1,8 @@
 (() => {
   const MESSAGE_SOURCE = 'jable-collect';
   const MESSAGE_TYPE = 'jable-detail-action';
+  const COMMAND_MESSAGE_TYPE = 'jable-detail-command';
+  const COMMAND_RESULT_MESSAGE_TYPE = 'jable-detail-command-result';
   const FAVORITE_ACTIONS = new Set(['add_to_favourites', 'delete_from_favourites']);
   const recentEvents = new Map();
   const nativeFetch = window.fetch;
@@ -197,4 +199,90 @@
 
     return nativeXHRSend.apply(this, arguments);
   };
+
+  window.addEventListener('message', async (event) => {
+    if (event.source !== window) return;
+
+    const data = event.data;
+    if (!data || data.source !== MESSAGE_SOURCE || data.type !== COMMAND_MESSAGE_TYPE) {
+      return;
+    }
+
+    const detail = data.detail || {};
+    if (detail.action !== 'delete_from_favourites') {
+      return;
+    }
+
+    const favType = detail.favType;
+    const videoId = String(detail.videoId || '').trim();
+    const requestVideoKey = String(detail.requestVideoKey || '').trim();
+    if ((favType !== '0' && favType !== '1') || !videoId) {
+      window.postMessage({
+        source: MESSAGE_SOURCE,
+        type: COMMAND_RESULT_MESSAGE_TYPE,
+        detail: {
+          requestId: detail.requestId,
+          success: false,
+          error: '缺少 videoId 或 favType'
+        }
+      }, window.location.origin);
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.set('mode', 'async');
+      params.set('format', 'json');
+      params.set('playlist_id', '0');
+      params.set('action', 'delete_from_favourites');
+      params.set('fav_type', favType);
+      params.set('video_id', videoId);
+      params.append('video_ids[]', videoId);
+
+      const response = await nativeFetch(window.location.origin + currentPath + '?' + params.toString(), {
+        method: 'GET',
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) {
+        throw new Error(`请求失败 (${response.status})`);
+      }
+
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+      }
+
+      if (!payload || payload.status === 'failure') {
+        throw new Error(payload?.msg || payload?.message || 'Jable 删除失败');
+      }
+
+      emitAction({
+        action: 'delete_from_favourites',
+        favType,
+        requestVideoId: requestVideoKey || videoId,
+        pathname: currentPath
+      }, payload);
+
+      window.postMessage({
+        source: MESSAGE_SOURCE,
+        type: COMMAND_RESULT_MESSAGE_TYPE,
+        detail: {
+          requestId: detail.requestId,
+          success: true
+        }
+      }, window.location.origin);
+    } catch (error) {
+      window.postMessage({
+        source: MESSAGE_SOURCE,
+        type: COMMAND_RESULT_MESSAGE_TYPE,
+        detail: {
+          requestId: detail.requestId,
+          success: false,
+          error: error?.message || 'Jable 删除失败'
+        }
+      }, window.location.origin);
+    }
+  });
 })();

@@ -35,6 +35,16 @@ async function deleteVideoFromDB(url, site) {
   if (!response.success) throw new Error(response.error);
 }
 
+async function removeJableVideoSourceRemotely(url, pageType) {
+  const response = await sendToBackground('removeJableVideoSourceRemotely', {
+    url,
+    pageType,
+    site: 'jable'
+  });
+  if (!response.success) throw new Error(response.error);
+  return response;
+}
+
 async function clearAllVideosFromDB(site) {
   const response = await sendToBackground('clearAllVideos', { site });
   if (!response.success) throw new Error(response.error);
@@ -61,6 +71,7 @@ class OptionsManager {
     this.sortOrder = 'asc';
     this.searchKeyword = '';
     this.sourceFilter = 'all';
+    this.pendingRemovals = new Set();
 
     this.init();
   }
@@ -221,6 +232,80 @@ class OptionsManager {
     return '请到 Jable 收藏页面获取数据';
   }
 
+  getSourceActionLabel(pageType = 'favorites') {
+    return pageType === 'watchLater' ? '删除稍后观看' : '删除收藏';
+  }
+
+  getSourceRemovalSuccessMessage(pageType = 'favorites') {
+    return pageType === 'watchLater' ? '已从 Jable 稍后观看移除' : '已从 Jable 收藏移除';
+  }
+
+  getRemovalKey(url, pageType) {
+    return `${url}::${pageType}`;
+  }
+
+  isRemovalPending(url, pageType) {
+    return this.pendingRemovals.has(this.getRemovalKey(url, pageType));
+  }
+
+  isVideoRemovalPending(url) {
+    return this.isRemovalPending(url, 'favorites') || this.isRemovalPending(url, 'watchLater');
+  }
+
+  getJableRemovalActions(video) {
+    if (this.activeSite !== 'jable') {
+      return [];
+    }
+
+    const actions = [];
+    if (hasSource(video, 'favorites', this.activeSite)) {
+      actions.push('favorites');
+    }
+    if (hasSource(video, 'watchLater', this.activeSite)) {
+      actions.push('watchLater');
+    }
+    return actions;
+  }
+
+  renderJableRemovalActions(video) {
+    if (this.activeSite !== 'jable') {
+      return '';
+    }
+
+    const url = video.url || video.detailHref || '';
+    const actions = this.getJableRemovalActions(video);
+    if (!url || !actions.length) {
+      return '';
+    }
+
+    const disableAll = this.isVideoRemovalPending(url);
+    return `
+      <div class="video-actions">
+        ${actions.map(pageType => {
+          const pending = this.isRemovalPending(url, pageType);
+          return `
+            <button
+              class="video-remove-btn${pending ? ' pending' : ''}"
+              data-url="${url}"
+              data-page-type="${pageType}"
+              ${disableAll ? 'disabled' : ''}
+            >
+              ${pending ? '删除中...' : this.getSourceActionLabel(pageType)}
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  getFriendlyRemovalError(error) {
+    const message = error?.message || 'Jable 删除失败';
+    if (message.includes('登录') || message.toLowerCase().includes('login')) {
+      return 'Jable 删除失败，请确认已登录网站';
+    }
+    return message;
+  }
+
   renderVideoList() {
     const videos = this.getPaginatedVideos();
 
@@ -254,6 +339,7 @@ class OptionsManager {
                 <span class="video-source-badge ${source.className}">${source.label}</span>
               </div>
             </div>
+            ${this.renderJableRemovalActions(video)}
           </div>
         </div>
       `;
@@ -275,6 +361,14 @@ class OptionsManager {
       card.addEventListener('click', () => {
         const url = card.dataset.url;
         if (url) window.open(url, '_blank');
+      });
+    });
+
+    this.videoListEl.querySelectorAll('.video-remove-btn').forEach(button => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.removeJableVideoSource(button.dataset.url, button.dataset.pageType);
       });
     });
 
@@ -320,14 +414,29 @@ class OptionsManager {
     this.refresh();
   }
 
-  async deleteVideo(url) {
+  async removeJableVideoSource(url, pageType) {
+    if (this.activeSite !== 'jable' || !url || !pageType) {
+      return;
+    }
+
+    const key = this.getRemovalKey(url, pageType);
+    if (this.pendingRemovals.has(key)) {
+      return;
+    }
+
+    this.pendingRemovals.add(key);
+    this.renderVideoList();
+
     try {
-      await deleteVideoFromDB(url, this.activeSite);
+      await removeJableVideoSourceRemotely(url, pageType);
       await this.loadVideos();
-      this.showToast('删除成功', 'success');
+      this.showToast(this.getSourceRemovalSuccessMessage(pageType), 'success');
     } catch (error) {
-      console.error('删除失败:', error);
-      this.showToast('删除失败', 'error');
+      console.error('Jable 官网删除失败:', error);
+      this.showToast(this.getFriendlyRemovalError(error), 'error');
+    } finally {
+      this.pendingRemovals.delete(key);
+      this.renderVideoList();
     }
   }
 

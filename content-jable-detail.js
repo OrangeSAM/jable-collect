@@ -1,10 +1,14 @@
 const JABLE_SITE = 'jable';
 const DETAIL_ACTION_MESSAGE_SOURCE = 'jable-collect';
 const DETAIL_ACTION_MESSAGE_TYPE = 'jable-detail-action';
+const DETAIL_COMMAND_MESSAGE_TYPE = 'jable-detail-command';
+const DETAIL_COMMAND_RESULT_MESSAGE_TYPE = 'jable-detail-command-result';
+const ACTION_SYNC_TIMEOUT_MS = 15000;
 
 let actionQueue = Promise.resolve();
 let lastMessageKey = '';
 let lastMessageAt = 0;
+const pendingCommandWaiters = new Map();
 
 function normalizeJableUrl(url = window.location.href) {
   if (!url) return null;
@@ -60,6 +64,31 @@ function extractVideoId(url) {
   } catch (error) {
     return null;
   }
+}
+
+function extractNumericId(value = '') {
+  const text = trimText(String(value || ''));
+  return /^\d+$/.test(text) ? text : '';
+}
+
+function extractNumericVideoIdFromAssetUrl(url = '') {
+  if (!url) return '';
+
+  try {
+    const pathname = new URL(url, window.location.origin).pathname;
+    const previewMatch = pathname.match(/\/(\d+)\/preview\.jpg(?:$|[?#])/i);
+    if (previewMatch) {
+      return previewMatch[1];
+    }
+
+    const videoMatch = pathname.match(/\/(\d+)\/\1_preview\.mp4(?:$|[?#])/i);
+    if (videoMatch) {
+      return videoMatch[1];
+    }
+  } catch (error) {
+  }
+
+  return '';
 }
 
 function getCanonicalDetailUrl() {
@@ -366,10 +395,134 @@ window.addEventListener('message', (event) => {
 
   actionQueue = actionQueue
     .catch(() => {})
-    .then(() => syncVideoSource(detail))
+    .then(async () => {
+      await syncVideoSource(detail);
+
+      if (detail.action === 'delete_from_favourites' && detail.requestVideoId) {
+        const commandKey = `delete_from_favourites:${detail.favType}:${detail.requestVideoId.toUpperCase()}`;
+        const waiter = pendingCommandWaiters.get(commandKey);
+        if (waiter) {
+          pendingCommandWaiters.delete(commandKey);
+          clearTimeout(waiter.timer);
+          waiter.resolve();
+        }
+      }
+    })
     .catch((error) => {
+      if (detail.action === 'delete_from_favourites' && detail.requestVideoId) {
+        const commandKey = `delete_from_favourites:${detail.favType}:${detail.requestVideoId.toUpperCase()}`;
+        const waiter = pendingCommandWaiters.get(commandKey);
+        if (waiter) {
+          pendingCommandWaiters.delete(commandKey);
+          clearTimeout(waiter.timer);
+          waiter.reject(error);
+        }
+      }
+
       console.error('[jable-detail] 详情页动作同步失败:', error);
     });
 });
 
 injectHookScript();
+
+// Listen for commands from background (e.g. triggered from Options page)
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request.action !== 'removeVideoSourceFromWebsite') return false;
+
+  const { url, favType } = request;
+  if (!url || !favType) {
+    sendResponse({ success: false, error: '缺少 url 或 favType' });
+    return false;
+  }
+
+  const currentUrl = getCanonicalDetailUrl();
+  const normalizedRequestUrl = normalizeJableUrl(url);
+  if (!currentUrl || !normalizedRequestUrl || currentUrl !== normalizedRequestUrl) {
+    sendResponse({ success: false, error: '当前详情页与目标视频不匹配' });
+    return false;
+  }
+
+  if (favType !== '0' && favType !== '1') {
+    sendResponse({ success: false, error: '无效的 favType' });
+    return false;
+  }
+
+  const currentVideo = getCurrentVideoMetadata();
+  const numericVideoId = firstFilled([
+    extractNumericId(document.querySelector('button[data-video-id]')?.getAttribute('data-video-id')),
+    extractNumericId(document.querySelector('[data-video-id]')?.getAttribute('data-video-id')),
+    extractNumericId(document.querySelector('button[data-id]')?.getAttribute('data-id')),
+    extractNumericId(document.querySelector('[data-id]')?.getAttribute('data-id')),
+    extractNumericId(document.querySelector('input[name="video_id"]')?.value),
+    extractNumericId(document.querySelector('input[name="video_ids[]"]')?.value),
+    extractNumericVideoIdFromAssetUrl(currentVideo.imgSrc),
+    extractNumericVideoIdFromAssetUrl(currentVideo.imgDataSrc),
+    extractNumericVideoIdFromAssetUrl(currentVideo.preview)
+  ]);
+  if (!numericVideoId) {
+    sendResponse({ success: false, error: '当前页面缺少 video_id，无法执行官网删除' });
+    return false;
+  }
+
+  const requestVideoKey = currentVideo.videoId || normalizedRequestUrl;
+
+  // Register a one-shot waiter: after the hook fires and the local sync finishes,
+  // we resolve the command so Options reloads the already-updated local state.
+  const commandKey = `delete_from_favourites:${favType}:${requestVideoKey.toUpperCase()}`;
+
+  const promise = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingCommandWaiters.delete(commandKey);
+      reject(new Error('远程删除超时，Jable 未响应'));
+    }, ACTION_SYNC_TIMEOUT_MS);
+
+    pendingCommandWaiters.set(commandKey, { resolve, reject, timer });
+  });
+
+  const requestId = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+
+  function handleCommandResult(event) {
+    if (event.source !== window) return;
+
+    const data = event.data;
+    if (!data || data.source !== DETAIL_ACTION_MESSAGE_SOURCE || data.type !== DETAIL_COMMAND_RESULT_MESSAGE_TYPE) {
+      return;
+    }
+
+    const detail = data.detail || {};
+    if (detail.requestId !== requestId) {
+      return;
+    }
+
+    window.removeEventListener('message', handleCommandResult);
+
+    if (!detail.success) {
+      const waiter = pendingCommandWaiters.get(commandKey);
+      if (waiter) {
+        pendingCommandWaiters.delete(commandKey);
+        clearTimeout(waiter.timer);
+        waiter.reject(new Error(detail.error || 'Jable 删除失败'));
+      }
+    }
+  }
+
+  window.addEventListener('message', handleCommandResult);
+  window.postMessage({
+    source: DETAIL_ACTION_MESSAGE_SOURCE,
+    type: DETAIL_COMMAND_MESSAGE_TYPE,
+    detail: {
+      requestId,
+      action: 'delete_from_favourites',
+      favType,
+      videoId: numericVideoId,
+      requestVideoKey
+    }
+  }, window.location.origin);
+
+  promise
+    .then(() => sendResponse({ success: true }))
+    .catch((err) => sendResponse({ success: false, error: err.message }));
+
+  return true; // keep channel open for async response
+});
+
