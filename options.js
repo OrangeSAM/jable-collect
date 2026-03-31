@@ -85,8 +85,6 @@ class OptionsManager {
   }
 
   cacheElements() {
-    this.siteTitleEl = document.getElementById('site-title');
-    this.siteSubtitleEl = document.getElementById('site-subtitle');
     this.totalCountEl = document.getElementById('total-count');
     this.totalCountLabelEl = document.getElementById('total-count-label');
     this.displayCountEl = document.getElementById('display-count');
@@ -134,8 +132,6 @@ class OptionsManager {
   }
 
   renderSiteState() {
-    this.siteTitleEl.textContent = getSiteLabel(this.activeSite);
-    this.siteSubtitleEl.textContent = this.activeSite === 'missav' ? 'MissAV 收藏管理' : '视频收藏管理';
     this.totalCountLabelEl.textContent = this.activeSite === 'missav' ? '总收藏' : '总收藏';
     this.searchInputEl.placeholder = this.activeSite === 'missav' ? '搜索 MissAV 标题或番号...' : '搜索番号或标题...';
     this.sourceTabsEl.classList.toggle('hidden', this.activeSite === 'missav');
