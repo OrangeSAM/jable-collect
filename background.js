@@ -441,6 +441,9 @@ async function getVideoStats(site = DEFAULT_SITE) {
   };
 }
 
+// 注意：此函数仅被 MissAV 使用，Jable 的单条删除通过 removeVideoSource / removeJableVideoSourceRemotely 路径处理。
+// MissAV store（missav_videos）的 keyPath 是 url，所以这里用 url 作为主键。
+// Jable store（jable_videos）的 keyPath 是 videoId，不能用此函数删除，需通过 removeVideoSource 的 store.delete(prev.videoId) 实现。
 async function deleteVideo(url, site = DEFAULT_SITE) {
   const database = await initDB();
   const storeName = getStoreName(site);
