@@ -70,7 +70,7 @@ function parseMissavDomData(html) {
       url: detailHref,
       detailHref,
       detailTitle: (titleLink?.textContent || img?.alt || '').trim(),
-      imgSrc: img?.src || img?.dataset?.src || '',
+      imgSrc: img?.dataset?.src || img?.src || '',
       imgDataSrc: img?.dataset?.src || img?.src || '',
       preview: preview?.dataset?.src || preview?.src || '',
       duration: duration?.textContent?.trim() || '',

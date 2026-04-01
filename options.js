@@ -154,10 +154,14 @@ class OptionsManager {
 
     if (this.searchKeyword) {
       const lower = this.searchKeyword.toLowerCase();
-      base = base.filter(video =>
-        (video.videoId && video.videoId.toLowerCase().includes(lower)) ||
-        (video.title && video.title.toLowerCase().includes(lower))
-      );
+      base = base.filter(video => {
+        // TODO: MissAV 旧数据用 detailTitle，待字段对齐后可删除 detailTitle 兼容
+        const title = video.title || video.detailTitle || '';
+        return (
+          (video.videoId && video.videoId.toLowerCase().includes(lower)) ||
+          title.toLowerCase().includes(lower)
+        );
+      });
     }
 
     this.filteredVideos = base;
@@ -165,6 +169,8 @@ class OptionsManager {
     this.filteredVideos.sort((a, b) => {
       if (this.sortField === 'original') {
         const getOrder = (video) => {
+          // TODO: MissAV 用 order 字段，Jable 用 favOrder/watchLaterOrder，待字段对齐后可统一
+          if (video.order != null) return video.order;
           if (this.sourceFilter === 'watchLater') return video.watchLaterOrder || 0;
           if (this.sourceFilter === 'all') {
             // 优先用收藏顺序，其次用稍后观看顺序，都没有则 0
@@ -334,11 +340,17 @@ class OptionsManager {
       return `
         <div class="video-card" data-url="${video.url}">
           <div class="video-thumb">
-            <img src="${video.imgSrc || ''}" alt="${video.videoId || ''}" loading="lazy">
+            <img src="${
+              // TODO: MissAV 旧数据 imgSrc 可能是懒加载占位图，imgDataSrc 才是真实地址，待字段对齐后可删除 imgDataSrc 兼容
+              video.imgDataSrc || video.imgSrc || ''
+            }" alt="${video.videoId || ''}" loading="lazy">
             ${video.preview ? `<video class="video-preview" src="${video.preview}" muted loop preload="none"></video>` : ''}
           </div>
           <div class="video-content">
-            <div class="video-title" title="${video.title || ''}">${video.title || '无标题'}</div>
+          <div class="video-title" title="${video.title || video.detailTitle || ''}">${
+            // TODO: MissAV 旧数据用 detailTitle，待字段对齐后可删除 detailTitle 兼容
+            video.title || video.detailTitle || '无标题'
+          }</div>
             <div class="video-meta">
               <div class="video-tags">
                 <span class="video-id-tag">${video.videoId || '未知'}</span>
