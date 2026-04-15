@@ -33,7 +33,7 @@ English version [*click here*](https://github.com/OrangeSAM/jable-collect/blob/m
 由于本插件目前未上架 Chrome Web Store，需手动加载：
 
 1. **下载安装包**
-   - 点击 [*链接*](https://github.com/OrangeSAM/jable-collect/releases/tag/v1.0.0) **jable-collect-v1.0.0**，解压到本地
+   - 点击 [*链接*](https://github.com/OrangeSAM/jable-collect/releases/tag/v1.0.3) **jable-collect-v1.0.3**，解压到本地
 
 2. **加载插件**
    - 打开 Chrome，地址栏输入 `chrome://extensions/`
@@ -57,7 +57,7 @@ English version [*click here*](https://github.com/OrangeSAM/jable-collect/blob/m
 ### 同步 MissAV 收藏
 
 1. 登录 MissAV 账号
-2. 访问收藏页：`https://missav.ws/saved`
+2. 访问收藏页：`https://missav.ws/saved`，其他域名后缀ai&live也支持
 3. 同上，点击 **「同步当前页面」**
 
 ### 管理收藏
