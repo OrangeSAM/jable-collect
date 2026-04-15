@@ -103,7 +103,7 @@ function getPageContext(url = '') {
       };
     }
 
-    if (parsedUrl.hostname === 'missav.ws') {
+    if (parsedUrl.hostname === 'missav.ws' || parsedUrl.hostname === 'missav.ai' || parsedUrl.hostname === 'missav.live') {
       const segments = pathname.split('/').filter(Boolean);
       const isSavedPage = segments[segments.length - 1] === 'saved';
 

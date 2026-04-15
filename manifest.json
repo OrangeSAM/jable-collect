@@ -29,7 +29,11 @@
   {
     "matches": [
       "https://missav.ws/saved*",
-      "https://missav.ws/*/saved*"
+      "https://missav.ws/*/saved*",
+      "https://missav.ai/saved*",
+      "https://missav.ai/*/saved*",
+      "https://missav.live/saved*",
+      "https://missav.live/*/saved*"
     ],
     "js": ["content-missav.js"]
   }
