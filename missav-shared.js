@@ -1,6 +1,6 @@
 (function initMissavShared(root) {
   const ALLOWED_HOSTS = new Set(['missav.ws', 'missav.ai', 'missav.live']);
-  const DETAIL_VIDEO_ID_PATTERN = /^((?:[a-z0-9]+(?:[-_][a-z0-9]+)*[-_]\d+)|(?:[a-z]+\d+))(?:-[a-z]+(?:-[a-z]+)*)?$/i;
+  const DETAIL_VIDEO_ID_PATTERN = /^([a-z0-9]+(?:[-_][a-z0-9]+)*\d)(?:-[a-z]+(?:-[a-z]+)*)?$/i;
 
   function isAllowedMissavHost(hostname) {
     return ALLOWED_HOSTS.has(String(hostname || '').toLowerCase());
@@ -30,7 +30,9 @@
       const segments = new URL(normalizedUrl).pathname.split('/').filter(Boolean);
       const candidate = decodeURIComponent(segments[segments.length - 1] || '');
       const match = candidate.match(DETAIL_VIDEO_ID_PATTERN);
-      return match ? match[1].toUpperCase() : null;
+      const videoId = match?.[1] || '';
+      if (!videoId || (!/[a-z]/i.test(videoId) && !/[-_]/.test(videoId))) return null;
+      return videoId.toUpperCase();
     } catch (error) {
       return null;
     }
