@@ -45,6 +45,12 @@ async function removeJableVideoSourceRemotely(url, pageType) {
   return response;
 }
 
+async function removeMissavFavoriteRemotely(url) {
+  const response = await sendToBackground('removeMissavFavoriteRemotely', { url, site: 'missav' });
+  if (!response.success) throw new Error(response.error);
+  return response;
+}
+
 async function clearAllVideosFromDB(site) {
   const response = await sendToBackground('clearAllVideos', { site });
   if (!response.success) throw new Error(response.error);
@@ -72,6 +78,7 @@ class OptionsManager {
     this.searchKeyword = '';
     this.sourceFilter = 'all';
     this.pendingRemovals = new Set();
+    this.missavReloadTimer = null;
 
     this.init();
   }
@@ -120,6 +127,19 @@ class OptionsManager {
         </div>
       `;
     }
+  }
+
+  scheduleMissavReload() {
+    if (this.activeSite !== 'missav') return;
+    clearTimeout(this.missavReloadTimer);
+    this.missavReloadTimer = setTimeout(() => {
+      this.loadVideos();
+    }, 100);
+  }
+
+  handleRuntimeMessage(request) {
+    if (request?.action !== 'missavFavoritesChanged' || request.site !== 'missav') return;
+    this.scheduleMissavReload();
   }
 
   showLoading() {
@@ -310,10 +330,35 @@ class OptionsManager {
     `;
   }
 
+  renderMissavRemovalActions(video) {
+    if (this.activeSite !== 'missav' || !video.url) return '';
+    const pending = this.isRemovalPending(video.url, 'favorites');
+    return `
+      <div class="video-actions">
+        <button
+          class="video-remove-btn${pending ? ' pending' : ''}"
+          data-url="${video.url}"
+          data-page-type="favorites"
+          data-site="missav"
+          ${pending ? 'disabled' : ''}
+        >
+          ${pending ? '官网确认中...' : '从 MissAV 官网取消收藏'}
+        </button>
+      </div>
+    `;
+  }
+
+  renderRemovalActions(video) {
+    return this.activeSite === 'missav'
+      ? this.renderMissavRemovalActions(video)
+      : this.renderJableRemovalActions(video);
+  }
+
   getFriendlyRemovalError(error) {
-    const message = error?.message || 'Jable 删除失败';
+    const siteLabel = getSiteLabel(this.activeSite);
+    const message = error?.message || `${siteLabel} 删除失败`;
     if (message.includes('登录') || message.toLowerCase().includes('login')) {
-      return 'Jable 删除失败，请确认已登录网站';
+      return `${siteLabel} 删除失败，请确认已登录网站`;
     }
     return message;
   }
@@ -357,7 +402,7 @@ class OptionsManager {
                 <span class="video-source-badge ${source.className}">${source.label}</span>
               </div>
             </div>
-            ${this.renderJableRemovalActions(video)}
+            ${this.renderRemovalActions(video)}
           </div>
         </div>
       `;
@@ -386,7 +431,11 @@ class OptionsManager {
       button.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        this.removeJableVideoSource(button.dataset.url, button.dataset.pageType);
+        if (button.dataset.site === 'missav' || this.activeSite === 'missav') {
+          this.removeMissavFavorite(button.dataset.url);
+        } else {
+          this.removeJableVideoSource(button.dataset.url, button.dataset.pageType);
+        }
       });
     });
 
@@ -451,6 +500,27 @@ class OptionsManager {
       this.showToast(this.getSourceRemovalSuccessMessage(pageType), 'success');
     } catch (error) {
       console.error('Jable 官网删除失败:', error);
+      this.showToast(this.getFriendlyRemovalError(error), 'error');
+    } finally {
+      this.pendingRemovals.delete(key);
+      this.renderVideoList();
+    }
+  }
+
+  async removeMissavFavorite(url) {
+    if (this.activeSite !== 'missav' || !url) return;
+    const key = this.getRemovalKey(url, 'favorites');
+    if (this.pendingRemovals.has(key)) return;
+    if (!confirm('将同时从 MissAV 官网取消收藏。官网确认成功后，本地记录才会删除。继续吗？')) return;
+
+    this.pendingRemovals.add(key);
+    this.renderVideoList();
+    try {
+      await removeMissavFavoriteRemotely(url);
+      await this.loadVideos();
+      this.showToast('已从 MissAV 官网取消收藏', 'success');
+    } catch (error) {
+      console.error('MissAV 官网取消收藏失败:', error);
       this.showToast(this.getFriendlyRemovalError(error), 'error');
     } finally {
       this.pendingRemovals.delete(key);
@@ -549,6 +619,18 @@ class OptionsManager {
   }
 
   bindEvents() {
+    chrome.runtime.onMessage.addListener((request) => {
+      this.handleRuntimeMessage(request);
+    });
+
+    window.addEventListener('focus', () => {
+      this.scheduleMissavReload();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this.scheduleMissavReload();
+    });
+
     this.siteTabsEl.addEventListener('click', async (event) => {
       const btn = event.target.closest('.site-tab');
       if (!btn) return;
@@ -607,6 +689,12 @@ class OptionsManager {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  new OptionsManager();
-});
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    new OptionsManager();
+  });
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { OptionsManager };
+}
