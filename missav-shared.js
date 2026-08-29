@@ -1,6 +1,6 @@
 (function initMissavShared(root) {
   const ALLOWED_HOSTS = new Set(['missav.ws', 'missav.ai', 'missav.live']);
-  const DETAIL_VIDEO_ID_PATTERN = /^((?:[a-z0-9]+(?:-[a-z0-9]+)*-\d+)|(?:[a-z]+\d+))(?:-uncensored-leak)?$/i;
+  const DETAIL_VIDEO_ID_PATTERN = /^((?:[a-z0-9]+(?:[-_][a-z0-9]+)*[-_]\d+)|(?:[a-z]+\d+))(?:-uncensored-leak)?$/i;
 
   function isAllowedMissavHost(hostname) {
     return ALLOWED_HOSTS.has(String(hostname || '').toLowerCase());

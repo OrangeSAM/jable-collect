@@ -18,6 +18,10 @@ test('extracts only detail-page style video IDs', () => {
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/dm31/md0195'), 'MD0195');
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/mfk0033'), 'MFK0033');
   assert.equal(
+    Shared.extractMissavVideoId('https://missav.ws/pacopacomama-070426_100'),
+    'PACOPACOMAMA-070426_100'
+  );
+  assert.equal(
     Shared.extractMissavVideoId('https://missav.ws/cn/siro-5720-uncensored-leak'),
     'SIRO-5720'
   );
