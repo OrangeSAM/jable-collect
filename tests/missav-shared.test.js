@@ -25,6 +25,14 @@ test('extracts only detail-page style video IDs', () => {
     Shared.extractMissavVideoId('https://missav.ws/cn/siro-5720-uncensored-leak'),
     'SIRO-5720'
   );
+  assert.equal(
+    Shared.extractMissavVideoId('https://missav.ws/mifd-696-chinese-subtitle'),
+    'MIFD-696'
+  );
+  assert.equal(
+    Shared.extractMissavVideoId('https://missav.ws/mimk-284-chinese-subtitle'),
+    'MIMK-284'
+  );
   assert.equal(Shared.isMissavDetailUrl('https://missav.ws/cn/siro-5720-uncensored-leak'), true);
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/cn/saved'), null);
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/api/actresses/1016525'), null);
