@@ -14,12 +14,16 @@ test('normalizes supported MissAV URLs without query or hash', () => {
 test('extracts only detail-page style video IDs', () => {
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/hmdnv-727'), 'HMDNV-727');
   assert.equal(Shared.extractMissavVideoId('https://missav.live/cn/hmdnv-727'), 'HMDNV-727');
+  assert.equal(Shared.extractMissavVideoId('https://missav.ws/dm26/mpg017'), 'MPG017');
+  assert.equal(Shared.extractMissavVideoId('https://missav.ws/dm31/md0195'), 'MD0195');
+  assert.equal(Shared.extractMissavVideoId('https://missav.ws/mfk0033'), 'MFK0033');
   assert.equal(
     Shared.extractMissavVideoId('https://missav.ws/cn/siro-5720-uncensored-leak'),
     'SIRO-5720'
   );
   assert.equal(Shared.isMissavDetailUrl('https://missav.ws/cn/siro-5720-uncensored-leak'), true);
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/cn/saved'), null);
+  assert.equal(Shared.extractMissavVideoId('https://missav.ws/api/actresses/1016525'), null);
 });
 
 test('parses one complete opaque item endpoint pair', () => {
