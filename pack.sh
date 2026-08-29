@@ -13,6 +13,9 @@ FILES=(
   background.js
   content.js
   content-missav.js
+  missav-shared.js
+  content-missav-detail.js
+  content-missav-detail-hook.js
   content-jable-detail.js
   content-jable-detail-hook.js
   popup.html

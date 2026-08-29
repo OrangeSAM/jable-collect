@@ -1,5 +1,6 @@
 {
 "manifest_version": 3,
+"minimum_chrome_version": "111",
 "name": "Jable Collect",
 "version": "1.0.1",
 "description": "抓取、整理和浏览 Jable 收藏与稍后观看数据",
@@ -11,7 +12,9 @@
 ],
 "host_permissions": [
   "https://jable.tv/*",
-  "https://missav.ws/*"
+  "https://missav.ws/*",
+  "https://missav.ai/*",
+  "https://missav.live/*"
 ],
 "background": {
   "service_worker": "background.js"
@@ -35,13 +38,30 @@
       "https://missav.live/saved*",
       "https://missav.live/*/saved*"
     ],
-    "js": ["content-missav.js"]
+    "js": ["missav-shared.js", "content-missav.js"]
+  },
+  {
+    "matches": [
+      "https://missav.ws/*",
+      "https://missav.ai/*",
+      "https://missav.live/*"
+    ],
+    "js": ["missav-shared.js", "content-missav-detail.js"],
+    "run_at": "document_start"
   }
 ],
 "web_accessible_resources": [
   {
     "resources": ["content-jable-detail-hook.js"],
     "matches": ["https://jable.tv/*"]
+  },
+  {
+    "resources": ["missav-shared.js", "content-missav-detail-hook.js"],
+    "matches": [
+      "https://missav.ws/*",
+      "https://missav.ai/*",
+      "https://missav.live/*"
+    ]
   }
 ],
 "action": {

@@ -1,3 +1,7 @@
+importScripts('missav-shared.js');
+
+const Missav = globalThis.MissavShared;
+
 // ========== Amplitude 统计 ==========
 const AMPLITUDE_API_KEY = 'd9a3d2b41c190251a9149f056e2e2353';
 
@@ -11,6 +15,18 @@ async function getDeviceId() {
 
 async function trackEvent(eventName, properties = {}) {
   try {
+    const telemetrySettings = await chrome.storage.local.get('telemetry_enabled');
+    if (telemetrySettings.telemetry_enabled !== true) return;
+
+    const safeProperties = {};
+    Object.entries(properties).forEach(([key, value]) => {
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        safeProperties[key] = value;
+      } else if (['site', 'page_type', 'source', 'error_category'].includes(key) && typeof value === 'string') {
+        safeProperties[key] = value.slice(0, 64);
+      }
+    });
+
     const deviceId = await getDeviceId();
     await fetch('https://api2.amplitude.com/2/httpapi', {
       method: 'POST',
@@ -20,7 +36,7 @@ async function trackEvent(eventName, properties = {}) {
         events: [{
           device_id: deviceId,
           event_type: eventName,
-          event_properties: properties,
+          event_properties: safeProperties,
           platform: 'Chrome Extension',
         }]
       })
@@ -43,6 +59,22 @@ function normalizeSite(site = DEFAULT_SITE) {
 
 function getStoreName(site = DEFAULT_SITE) {
   return normalizeSite(site) === 'missav' ? MISSAV_STORE_NAME : JABLE_STORE_NAME;
+}
+
+function prepareMissavVideo(video = {}) {
+  const url = Missav.normalizeMissavUrl(video.url || video.detailHref);
+  const videoId = String(video.videoId || Missav.extractMissavVideoId(url) || '').toUpperCase() || null;
+  if (!url || !videoId) return null;
+
+  return {
+    ...video,
+    url,
+    detailHref: url,
+    videoId,
+    site: 'missav',
+    from: 'missav',
+    pageType: 'favorites'
+  };
 }
 
 function createJableStore(database) {
@@ -297,39 +329,130 @@ async function saveJableVideos(database, videos, pageType = 'favorites') {
 }
 
 async function saveMissavVideos(database, videos) {
-  const existing = await readAllFromStore(database, MISSAV_STORE_NAME);
-  const existingMap = new Map(existing.map(video => [video.url, video]));
-  let order = getMaxOrder(existing);
+  const incomingMap = new Map();
+  videos.forEach((video) => {
+    const prepared = prepareMissavVideo(video);
+    if (prepared) incomingMap.set(prepared.videoId, prepared);
+  });
+  if (!incomingMap.size) return 0;
 
   return new Promise((resolve, reject) => {
     const tx = database.transaction(MISSAV_STORE_NAME, 'readwrite');
     const store = tx.objectStore(MISSAV_STORE_NAME);
+    const getAllRequest = store.getAll();
 
-    videos.forEach(video => {
-      const nextVideo = {
-        ...video,
-        site: 'missav',
-        pageType: 'favorites'
-      };
+    getAllRequest.onerror = () => tx.abort();
+    getAllRequest.onsuccess = () => {
+      const existing = getAllRequest.result || [];
+      let newRecordCount = 0;
+      incomingMap.forEach((incoming, videoId) => {
+        const hasIdentityMatch = existing.some((video) => {
+          const existingId = String(video.videoId || Missav.extractMissavVideoId(video.url) || '').toUpperCase();
+          return existingId === videoId;
+        });
+        const hasUrlMatch = existing.some((record) => Missav.normalizeMissavUrl(record.url) === incoming.url);
+        if (!hasIdentityMatch && !hasUrlMatch) newRecordCount++;
+      });
+      let nextFrontOrder = Missav.getFrontOrderStart(
+        existing.map((video) => video.order),
+        newRecordCount
+      );
 
-      nextVideo.videoId = nextVideo.videoId || extractVideoId(nextVideo.detailHref || nextVideo.url, 'missav');
+      incomingMap.forEach((incoming, videoId) => {
+        const previousRecords = existing.filter((video) => {
+          const existingId = String(video.videoId || Missav.extractMissavVideoId(video.url) || '').toUpperCase();
+          return existingId === videoId;
+        });
+        const sameUrl = existing.find((record) => Missav.normalizeMissavUrl(record.url) === incoming.url) || null;
+        const previous = previousRecords[0] || sameUrl;
 
-      const prev = existingMap.get(nextVideo.url);
-      if (prev) {
-        nextVideo.order = prev.order;
-      } else {
-        order++;
-        nextVideo.order = order;
-      }
+        previousRecords.forEach((record) => store.delete(record.url));
+        if (!previousRecords.some((record) => record.url === incoming.url)) {
+          if (sameUrl) store.delete(sameUrl.url);
+        }
 
-      store.put(nextVideo);
-    });
+        const merged = {
+          ...(previous || {}),
+          ...incoming,
+          title: pickPreferredValue(incoming.title || incoming.detailTitle, previous?.title || previous?.detailTitle) || '',
+          detailTitle: pickPreferredValue(incoming.detailTitle || incoming.title, previous?.detailTitle || previous?.title) || '',
+          imgSrc: pickPreferredValue(incoming.imgSrc || incoming.imgDataSrc, previous?.imgSrc || previous?.imgDataSrc) || '',
+          imgDataSrc: pickPreferredValue(incoming.imgDataSrc || incoming.imgSrc, previous?.imgDataSrc || previous?.imgSrc) || '',
+          preview: pickPreferredValue(incoming.preview, previous?.preview) || '',
+          order: previous?.order ?? nextFrontOrder++,
+          updatedAt: Date.now()
+        };
+        store.put(merged);
+      });
+    };
 
-    tx.oncomplete = () => resolve(videos.length);
+    tx.oncomplete = () => resolve(incomingMap.size);
     tx.onerror = () => {
       console.error('[background] 保存 MissAV 数据失败:', tx.error);
-      reject(tx.error);
+      reject(tx.error || new Error('保存 MissAV 数据失败'));
     };
+    tx.onabort = () => reject(tx.error || new Error('保存 MissAV 数据事务已回滚'));
+  });
+}
+
+async function replaceMissavFavorites(videos) {
+  const incomingMap = new Map();
+  videos.forEach((video, index) => {
+    const prepared = prepareMissavVideo(video);
+    if (!prepared || incomingMap.has(prepared.videoId)) return;
+    incomingMap.set(prepared.videoId, { ...prepared, order: index + 1, updatedAt: Date.now() });
+  });
+
+  if (incomingMap.size !== videos.length) {
+    throw new Error('MissAV 完整快照包含无效或重复影片，已拒绝替换');
+  }
+
+  const database = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(MISSAV_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(MISSAV_STORE_NAME);
+    try {
+      store.clear();
+      incomingMap.forEach((video) => store.put(video));
+    } catch (error) {
+      tx.abort();
+      reject(error);
+      return;
+    }
+
+    tx.oncomplete = () => resolve(incomingMap.size);
+    tx.onerror = () => reject(tx.error || new Error('替换 MissAV 收藏失败'));
+    tx.onabort = () => reject(tx.error || new Error('替换 MissAV 收藏事务已回滚'));
+  });
+}
+
+async function deleteMissavVideoByIdentity(videoId, url) {
+  const normalizedVideoId = String(videoId || Missav.extractMissavVideoId(url) || '').toUpperCase();
+  const normalizedUrl = Missav.normalizeMissavUrl(url);
+  if (!normalizedVideoId && !normalizedUrl) return 0;
+
+  const database = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(MISSAV_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(MISSAV_STORE_NAME);
+    const getAllRequest = store.getAll();
+    let deletedCount = 0;
+
+    getAllRequest.onerror = () => tx.abort();
+    getAllRequest.onsuccess = () => {
+      (getAllRequest.result || []).forEach((record) => {
+        const recordId = String(record.videoId || Missav.extractMissavVideoId(record.url) || '').toUpperCase();
+        const recordUrl = Missav.normalizeMissavUrl(record.url);
+        if ((normalizedVideoId && recordId === normalizedVideoId) || (normalizedUrl && recordUrl === normalizedUrl)) {
+          store.delete(record.url);
+          deletedCount++;
+        }
+      });
+    };
+
+    tx.oncomplete = () => resolve(deletedCount);
+    tx.onerror = () => reject(tx.error || new Error('删除 MissAV 本地记录失败'));
+    tx.onabort = () => reject(tx.error || new Error('删除 MissAV 本地记录事务已回滚'));
   });
 }
 
@@ -354,8 +477,8 @@ async function removeVideoSource(url, pageType = 'favorites', site = DEFAULT_SIT
   const normalizedSite = normalizeSite(site);
 
   if (normalizedSite === 'missav') {
-    await deleteVideo(url, normalizedSite);
-    return { removed: true, deleted: true };
+    const deletedCount = await deleteMissavVideoByIdentity(null, url);
+    return { removed: deletedCount > 0, deleted: deletedCount > 0 };
   }
 
   const database = await initDB();
@@ -445,6 +568,11 @@ async function getVideoStats(site = DEFAULT_SITE) {
 // MissAV store（missav_videos）的 keyPath 是 url，所以这里用 url 作为主键。
 // Jable store（jable_videos）的 keyPath 是 videoId，不能用此函数删除，需通过 removeVideoSource 的 store.delete(prev.videoId) 实现。
 async function deleteVideo(url, site = DEFAULT_SITE) {
+  if (normalizeSite(site) === 'missav') {
+    await deleteMissavVideoByIdentity(null, url);
+    return;
+  }
+
   const database = await initDB();
   const storeName = getStoreName(site);
 
@@ -474,13 +602,7 @@ function extractVideoId(url, site = DEFAULT_SITE) {
   if (!url) return null;
 
   if (normalizeSite(site) === 'missav') {
-    try {
-      const pathname = new URL(url, 'https://missav.ws').pathname.replace(/\/+$/, '');
-      const segments = pathname.split('/').filter(Boolean);
-      return segments.length ? decodeURIComponent(segments[segments.length - 1]).toUpperCase() : null;
-    } catch (error) {
-      return null;
-    }
+    return Missav.extractMissavVideoId(url);
   }
 
   try {
@@ -533,7 +655,7 @@ function waitForTabComplete(tabId, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(handleUpdated);
-      reject(new Error('打开 Jable 详情页超时'));
+      reject(new Error('打开详情页超时'));
     }, timeoutMs);
 
     function finish(result) {
@@ -634,6 +756,200 @@ async function removeJableVideoSourceRemotely(url, pageType = 'favorites', site 
   };
 }
 
+function getTab(tabId) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.get(tabId, (tab) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(tab);
+    });
+  });
+}
+
+function removeTab(tabId) {
+  return new Promise((resolve) => {
+    chrome.tabs.remove(tabId, () => resolve());
+  });
+}
+
+async function sendMessageToTabWithRetry(tabId, message, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      return await sendMessageToTab(tabId, message);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+  throw lastError || new Error('MissAV 详情页内容脚本未就绪');
+}
+
+async function hashMissavPath(url) {
+  const normalized = Missav.normalizeMissavUrl(url);
+  if (!normalized) return null;
+  const pathname = new URL(normalized).pathname;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pathname));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+let missavPendingWriteQueue = Promise.resolve();
+
+function updateMissavPending(requestId, record) {
+  missavPendingWriteQueue = missavPendingWriteQueue.catch(() => {}).then(async () => {
+    const result = await chrome.storage.session.get('missavPendingOperations');
+    const operations = { ...(result.missavPendingOperations || {}) };
+    if (record) operations[requestId] = record;
+    else delete operations[requestId];
+    await chrome.storage.session.set({ missavPendingOperations: operations });
+  });
+  return missavPendingWriteQueue;
+}
+
+function isMissavDetailTab(tab, videoId) {
+  if (!tab?.id || !tab.url || !Missav.isMissavDetailUrl(tab.url)) return false;
+  return Missav.extractMissavVideoId(tab.url) === videoId;
+}
+
+async function findOrCreateMissavDetailTab(url) {
+  const normalizedUrl = Missav.normalizeMissavUrl(url);
+  const videoId = Missav.extractMissavVideoId(normalizedUrl);
+  if (!normalizedUrl || !videoId) throw new Error('无效的 MissAV 影片链接');
+
+  const existingTabs = await queryTabs({
+    url: [
+      'https://missav.ws/*',
+      'https://missav.ai/*',
+      'https://missav.live/*'
+    ]
+  });
+  const matchedTab = existingTabs.find((tab) => isMissavDetailTab(tab, videoId));
+  if (matchedTab) return { tab: matchedTab, created: false, normalizedUrl, videoId };
+
+  const tab = await createTab({ url: normalizedUrl, active: false });
+  if (!tab?.id) throw new Error('无法打开 MissAV 详情页');
+  await waitForTabComplete(tab.id, 20000);
+  return { tab, created: true, normalizedUrl, videoId };
+}
+
+async function safelyCloseMissavOperationTab(tabId, created, pathHash) {
+  if (!created) return;
+  try {
+    const tab = await getTab(tabId);
+    if (tab?.active || !tab?.url) return;
+    const currentHash = await hashMissavPath(tab.url);
+    if (currentHash === pathHash) await removeTab(tabId);
+  } catch (error) {
+  }
+}
+
+async function setMissavFavoriteRemotely(url, desiredSaved) {
+  const { tab, created, normalizedUrl, videoId } = await findOrCreateMissavDetailTab(url);
+  const requestId = crypto.randomUUID();
+  const pathHash = await hashMissavPath(tab.url || normalizedUrl);
+  const pending = {
+    requestId,
+    tabId: tab.id,
+    desiredSaved: Boolean(desiredSaved),
+    created,
+    pathHash,
+    deadline: Date.now() + 30000
+  };
+  await updateMissavPending(requestId, pending);
+
+  try {
+    const response = await sendMessageToTabWithRetry(tab.id, {
+      action: 'setMissavFavoriteOnWebsite',
+      desiredSaved: Boolean(desiredSaved),
+      videoId
+    }, 20000);
+    if (!response?.success) {
+      const error = new Error(response?.error || 'MissAV 官网操作失败');
+      error.remoteChanged = Boolean(response?.remoteChanged);
+      throw error;
+    }
+    return { completed: true, state: response.state, url: normalizedUrl, videoId };
+  } finally {
+    await updateMissavPending(requestId, null);
+    await safelyCloseMissavOperationTab(tab.id, created, pathHash);
+  }
+}
+
+async function applyMissavVerifiedState(request, sender) {
+  const senderUrl = sender?.tab?.url;
+  const senderVideoId = Missav.extractMissavVideoId(senderUrl);
+  const video = prepareMissavVideo(request.video || {});
+  if (!senderUrl || !senderVideoId || !video || senderVideoId !== video.videoId) {
+    throw new Error('MissAV 页面身份校验失败');
+  }
+  if (!Missav.isVerifiedMissavState(request.state)) {
+    throw new Error('MissAV 状态未经验证');
+  }
+
+  if (request.state === 'authenticated_saved') {
+    const database = await initDB();
+    const count = await saveMissavVideos(database, [video]);
+    notifyMissavFavoritesChanged(video.videoId, true);
+    return { saved: true, count };
+  }
+
+  const deletedCount = await deleteMissavVideoByIdentity(video.videoId, video.url);
+  notifyMissavFavoritesChanged(video.videoId, false);
+  return { saved: false, deletedCount };
+}
+
+function notifyMissavFavoritesChanged(videoId, saved) {
+  chrome.runtime.sendMessage({
+    action: 'missavFavoritesChanged',
+    site: 'missav',
+    videoId,
+    saved: Boolean(saved)
+  }).catch(() => {
+    // 管理页未打开时没有接收方，这是正常情况。
+  });
+}
+
+async function recoverMissavPendingOperations() {
+  try {
+    const result = await chrome.storage.session.get('missavPendingOperations');
+    const operations = result.missavPendingOperations || {};
+    for (const [requestId, operation] of Object.entries(operations)) {
+      try {
+        const tab = await getTab(operation.tabId);
+        const currentHash = await hashMissavPath(tab.url);
+        if (!currentHash || currentHash !== operation.pathHash) {
+          await updateMissavPending(requestId, null);
+          continue;
+        }
+
+        if (Date.now() <= operation.deadline) {
+          const videoId = Missav.extractMissavVideoId(tab.url);
+          if (videoId) {
+            const response = await sendMessageToTabWithRetry(tab.id, {
+              action: 'setMissavFavoriteOnWebsite',
+              desiredSaved: Boolean(operation.desiredSaved),
+              videoId
+            }, 5000);
+            if (response?.success) await updateMissavPending(requestId, null);
+          }
+        } else {
+          await updateMissavPending(requestId, null);
+        }
+
+        await safelyCloseMissavOperationTab(tab.id, operation.created, operation.pathHash);
+      } catch (error) {
+        if (Date.now() > operation.deadline) await updateMissavPending(requestId, null);
+      }
+    }
+  } catch (error) {
+  }
+}
+
+recoverMissavPendingOperations();
+
 chrome.runtime.onInstalled.addListener((details) => {
   initDB();
   if (details.reason === 'install') {
@@ -672,6 +988,24 @@ async function handleMessage(request, sender, sendResponse) {
       case 'removeJableVideoSourceRemotely': {
         const result = await removeJableVideoSourceRemotely(request.url, request.pageType, request.site);
         sendResponse({ success: true, ...result });
+        break;
+      }
+
+      case 'removeMissavFavoriteRemotely': {
+        const result = await setMissavFavoriteRemotely(request.url, false);
+        sendResponse({ success: true, ...result });
+        break;
+      }
+
+      case 'applyMissavVerifiedState': {
+        const result = await applyMissavVerifiedState(request, sender);
+        sendResponse({ success: true, ...result });
+        break;
+      }
+
+      case 'replaceMissavFavorites': {
+        const count = await replaceMissavFavorites(request.videos || []);
+        sendResponse({ success: true, count, totalCount: count });
         break;
       }
 
