@@ -17,3 +17,15 @@ test('MissAV detail hook is injected from the isolated content script', () => {
   assert.ok(resources.includes('missav-shared.js'));
   assert.ok(resources.includes('content-missav-detail-hook.js'));
 });
+
+test('收藏页在业务脚本前加载持久同步状态栏', () => {
+  const jableFavorites = manifest.content_scripts.find((entry) =>
+    entry.js?.includes('content.js')
+  );
+  const missavFavorites = manifest.content_scripts.find((entry) =>
+    entry.js?.includes('content-missav.js')
+  );
+
+  assert.deepEqual(jableFavorites.js.slice(-2), ['sync-status-ui.js', 'content.js']);
+  assert.deepEqual(missavFavorites.js.slice(-2), ['sync-status-ui.js', 'content-missav.js']);
+});

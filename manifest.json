@@ -22,7 +22,7 @@
 "content_scripts": [
   {
     "matches": ["https://jable.tv/my/favourites/*"],
-    "js": ["content.js"]
+    "js": ["sync-status-ui.js", "content.js"]
   },
   {
     "matches": ["https://jable.tv/videos/*"],
@@ -38,7 +38,7 @@
       "https://missav.live/saved*",
       "https://missav.live/*/saved*"
     ],
-    "js": ["missav-shared.js", "content-missav.js"]
+    "js": ["missav-shared.js", "sync-status-ui.js", "content-missav.js"]
   },
   {
     "matches": [

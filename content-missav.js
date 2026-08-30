@@ -4,6 +4,8 @@ const BUTTON_ID = 'fetch-missav-favorites-btn';
 const PAGE_DELAY_MS = 350;
 const MAX_RETRIES = 3;
 const Shared = globalThis.MissavShared;
+let syncStatusPanel = null;
+let activeSyncStartedAt = null;
 
 function normalizePathname(pathname = window.location.pathname) {
   return pathname.replace(/\/{2,}/g, '/').replace(/\/+$/, '') || '/saved';
@@ -149,6 +151,12 @@ async function fetchSavedPage(page, attempt = 1) {
     await new Promise((resolve) => setTimeout(resolve, 800 * (2 ** (attempt - 1))));
     return fetchSavedPage(page, attempt + 1);
   }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error(`第 ${page} 页需要重新登录 MissAV，登录后再试`);
+  }
+  if (response.status === 429) {
+    throw new Error(`第 ${page} 页请求过于频繁，请稍候几分钟再试`);
+  }
   if (!response.ok) throw new Error(`请求第 ${page} 页失败：${response.status}`);
 
   let html;
@@ -233,13 +241,15 @@ function sendToBackground(action, data = {}) {
 }
 
 function setSyncStatus(status) {
+  const nextStatus = { ...status, site: MISSAV_SITE, pageType: PAGE_TYPE, updatedAt: Date.now() };
+  syncStatusPanel?.render(nextStatus);
   try {
     if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) {
       console.warn('[missav] 无法写入同步状态：storage API 不可用');
       return;
     }
     const pending = chrome.storage.local.set({
-      lastSyncStatus: { ...status, site: MISSAV_SITE, pageType: PAGE_TYPE, updatedAt: Date.now() }
+      lastSyncStatus: nextStatus
     });
     if (pending && typeof pending.catch === 'function') {
       pending.catch((error) => console.warn('[missav] 写入同步状态失败:', error));
@@ -258,8 +268,17 @@ function createFetchButton() {
   button.addEventListener('click', () => handleFetchClick());
 
   const container = document.createElement('div');
-  container.style.cssText = 'display:flex;justify-content:flex-end;margin:16px 0 20px;';
+  container.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;margin:16px 0 20px;';
   container.appendChild(button);
+  if (globalThis.SyncStatusUI) {
+    syncStatusPanel = globalThis.SyncStatusUI.createPanel({
+      site: MISSAV_SITE,
+      pageType: PAGE_TYPE,
+      siteLabel: 'MissAV',
+      sourceLabel: '收藏',
+      container
+    });
+  }
   const target = document.querySelector('nav + div.max-w-7xl') || document.querySelector('main .max-w-7xl') || document.querySelector('main') || document.body;
   if (target === document.body) {
     container.style.cssText += 'position:fixed;top:84px;right:24px;z-index:9999;margin:0;';
@@ -274,6 +293,12 @@ async function fetchAllFavorites() {
   const button = document.getElementById(BUTTON_ID);
   const updateProgress = (round, page, total) => {
     if (button) button.textContent = `校验 ${round}/2 · ${page}/${total}`;
+    setSyncStatus({
+      state: 'running',
+      startedAt: activeSyncStartedAt,
+      progress: { round, page, total },
+      message: `正在校验 MissAV 收藏，第 ${page}/${total} 页`
+    });
   };
 
   const first = await collectSnapshot(1, updateProgress);
@@ -303,19 +328,33 @@ async function handleFetchClick(confirmed = false) {
   if (!confirmed && !confirmFullSync()) return;
   button.disabled = true;
   button.textContent = '⏳ 准备校验...';
-  setSyncStatus({ state: 'running', message: '正在执行 MissAV 双轮安全同步' });
+  activeSyncStartedAt = Date.now();
+  setSyncStatus({ state: 'running', startedAt: activeSyncStartedAt, message: '正在准备 MissAV 双轮安全同步' });
 
   try {
     const result = await fetchAllFavorites();
     const message = result.mode === 'replaced'
       ? `同步完成，本地已与官网 ${result.count} 条收藏一致`
       : `检测到抓取期间收藏变化，已更新 ${result.count} 条，但没有删除本地旧记录`;
-    setSyncStatus({ state: 'success', count: result.count, mode: result.mode, message });
+    setSyncStatus({
+      state: 'success',
+      count: result.count,
+      mode: result.mode,
+      startedAt: activeSyncStartedAt,
+      completedAt: Date.now(),
+      message
+    });
     button.textContent = result.mode === 'replaced' ? '✅ 同步完成' : '⚠️ 已安全更新，未删除';
     showNotification(message);
   } catch (error) {
     console.error('[missav] 安全同步失败:', error);
-    setSyncStatus({ state: 'error', message: error.message || '同步 MissAV 收藏失败' });
+    const errorMessage = error.message || '同步 MissAV 收藏失败';
+    setSyncStatus({
+      state: 'error',
+      startedAt: activeSyncStartedAt,
+      completedAt: Date.now(),
+      message: errorMessage
+    });
     button.textContent = '❌ 同步失败，旧数据已保留';
     showNotification(error.message || '同步失败，旧数据已保留');
   }
@@ -324,6 +363,7 @@ async function handleFetchClick(confirmed = false) {
     button.disabled = false;
     button.textContent = '📥 安全同步 MissAV 收藏';
   }, 3000);
+  activeSyncStartedAt = null;
 }
 
 function showNotification(message) {

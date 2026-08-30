@@ -1,6 +1,61 @@
 importScripts('missav-shared.js');
 
 const Missav = globalThis.MissavShared;
+const DEFAULT_ACTION_TITLE = 'Jable Collect';
+
+function getSyncBadgeView(status) {
+  const views = {
+    running: {
+      text: '…',
+      color: '#d97706',
+      title: status?.message || '正在同步收藏'
+    },
+    success: {
+      text: '✓',
+      color: '#15803d',
+      title: status?.message || '收藏同步完成'
+    },
+    error: {
+      text: '!',
+      color: '#dc2626',
+      title: status?.message || '收藏同步未完成'
+    }
+  };
+  return views[status?.state] || { text: '', color: '#64748b', title: DEFAULT_ACTION_TITLE };
+}
+
+async function renderSyncBadge(status) {
+  const view = getSyncBadgeView(status);
+  await chrome.action.setBadgeBackgroundColor({ color: view.color });
+  await chrome.action.setBadgeText({ text: view.text });
+  await chrome.action.setTitle({
+    title: status ? `${DEFAULT_ACTION_TITLE} · ${view.title}` : DEFAULT_ACTION_TITLE
+  });
+}
+
+async function acknowledgeSyncBadge() {
+  const { lastSyncStatus } = await chrome.storage.local.get('lastSyncStatus');
+  if (lastSyncStatus?.state === 'running') return;
+  await chrome.action.setBadgeText({ text: '' });
+  await chrome.action.setTitle({ title: DEFAULT_ACTION_TITLE });
+  await chrome.storage.local.set({
+    lastSyncBadgeAcknowledgedAt: lastSyncStatus?.updatedAt || Date.now()
+  });
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.lastSyncStatus) {
+    renderSyncBadge(changes.lastSyncStatus.newValue || null).catch(() => {});
+  }
+});
+
+chrome.storage.local.get(['lastSyncStatus', 'lastSyncBadgeAcknowledgedAt'])
+  .then(({ lastSyncStatus, lastSyncBadgeAcknowledgedAt }) => {
+    const isUnread = lastSyncStatus?.state === 'running'
+      || (lastSyncStatus?.updatedAt || 0) > (lastSyncBadgeAcknowledgedAt || 0);
+    return renderSyncBadge(isUnread ? lastSyncStatus : null);
+  })
+  .catch(() => {});
 
 // ========== Amplitude 统计 ==========
 const AMPLITUDE_API_KEY = 'd9a3d2b41c190251a9149f056e2e2353';
@@ -1039,6 +1094,12 @@ async function handleMessage(request, sender, sendResponse) {
 
       case 'trackEvent': {
         trackEvent(request.eventName, request.properties || {});
+        sendResponse({ success: true });
+        break;
+      }
+
+      case 'acknowledgeSyncBadge': {
+        await acknowledgeSyncBadge();
         sendResponse({ success: true });
         break;
       }

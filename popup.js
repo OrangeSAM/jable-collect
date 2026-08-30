@@ -166,7 +166,16 @@ class PopupManager {
     this.bindEvents();
     await this.detectActiveTab();
     await this.loadLastSyncStatus();
+    await this.acknowledgeSyncResult();
     await this.loadStats();
+  }
+
+  async acknowledgeSyncResult() {
+    try {
+      await sendToBackground('acknowledgeSyncBadge');
+    } catch (error) {
+      // Popup 已经展示结果，角标清理失败不影响其他功能。
+    }
   }
 
   cacheElements() {
@@ -251,9 +260,9 @@ class PopupManager {
     this.syncButtonEl.disabled = !this.pageContext.supported || this.isSyncing;
 
     if (this.pageContext.supported && this.pageContext.site === 'missav') {
-      this.syncNoteEl.textContent = '同步会调用当前 MissAV /saved 页面里的抓取逻辑，并把结果写入 MissAV 独立数据表。';
+      this.syncNoteEl.textContent = '请确认已登录 MissAV。官网为准，数据只保存在当前浏览器。';
     } else if (this.pageContext.supported) {
-      this.syncNoteEl.textContent = '同步会调用当前页面已有的抓取逻辑，并把结果写入本地数据库。';
+      this.syncNoteEl.textContent = '请确认已登录 Jable。官网为准，数据只保存在当前浏览器。';
     } else if (this.pageContext.type === 'unsupported-jable') {
       this.syncNoteEl.textContent = '可同步页面仅限 /my/favourites/videos 和 /my/favourites/videos-watch-later。';
     } else if (this.pageContext.type === 'unsupported-missav') {
@@ -280,7 +289,7 @@ class PopupManager {
 
     if (!status) {
       this.syncStatusEl.className = 'empty';
-      this.syncStatusEl.textContent = '还没有同步记录';
+      this.syncStatusEl.textContent = '还没有同步记录。先登录站点并打开收藏页，再开始第一次同步。';
       return;
     }
 
@@ -299,12 +308,22 @@ class PopupManager {
     })();
 
     this.syncStatusEl.className = 'status-row';
-    this.syncStatusEl.innerHTML = `
-      <div class="status-main">${mainText}</div>
-      <div class="status-meta">站点：${siteLabel}</div>
-      <div class="status-meta">来源：${sourceLabel}</div>
-      <div class="status-meta">更新时间：${formatSyncTime(status.updatedAt)}</div>
-    `;
+    this.syncStatusEl.replaceChildren();
+    const rows = [
+      ['status-main', mainText],
+      ['status-meta', `站点：${siteLabel}`],
+      ['status-meta', `来源：${sourceLabel}`],
+      ['status-meta', `更新时间：${formatSyncTime(status.updatedAt)}`]
+    ];
+    if (status.state === 'error') {
+      rows.push(['status-meta', '原有本地数据已保留，请检查登录或网络后重试。']);
+    }
+    rows.forEach(([className, text]) => {
+      const row = document.createElement('div');
+      row.className = className;
+      row.textContent = text;
+      this.syncStatusEl.appendChild(row);
+    });
   }
 
   async handleSync() {

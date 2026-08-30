@@ -68,15 +68,19 @@ function getJableFavVideo(page) {
     "credentials": "include"
   })
     .then(response => {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`第 ${page} 页需要重新登录 Jable，登录后再试`);
+      }
+      if (response.status === 429) {
+        throw new Error(`第 ${page} 页请求过于频繁，请稍候几分钟再试`);
+      }
+      if (!response.ok) throw new Error(`请求第 ${page} 页失败：${response.status}`);
       return response.text();
     })
     .then(html => {
       const data = parseJableDomData(html);
       favVideoData.push(...data);
       console.log(`第${page}页收藏数据获取完成，共${data.length}条`);
-    })
-    .catch(error => {
-      console.error('Main fetch failed:', error);
     });
 }
 
@@ -93,15 +97,19 @@ function getJableWatchLater(page) {
     "credentials": "include"
   })
     .then(response => {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`第 ${page} 页需要重新登录 Jable，登录后再试`);
+      }
+      if (response.status === 429) {
+        throw new Error(`第 ${page} 页请求过于频繁，请稍候几分钟再试`);
+      }
+      if (!response.ok) throw new Error(`请求第 ${page} 页失败：${response.status}`);
       return response.text();
     })
     .then(html => {
       const data = parseJableDomData(html);
       laterData.push(...data);
       console.log(`第${page}页稍后观看数据获取完成，共${data.length}条`);
-    })
-    .catch(error => {
-      console.error('Main fetch failed:', error);
     });
 }
 
@@ -156,6 +164,8 @@ function deriveCoverImgFromPreview(previewUrl) {
 const isWatchLaterPage = window.location.pathname.includes('watch-later');
 const pageType = isWatchLaterPage ? '稍后观看' : '收藏';
 const pageTypeKey = isWatchLaterPage ? 'watchLater' : 'favorites';
+let syncStatusPanel = null;
+let activeSyncStartedAt = null;
 
 // 发送消息到 background.js
 function sendToBackground(action, data = {}) {
@@ -202,14 +212,26 @@ async function saveVideosToDB(videos) {
 }
 
 function setSyncStatus(status) {
-  chrome.storage.local.set({
-    lastSyncStatus: {
-      ...status,
-      site: 'jable',
-      pageType: pageTypeKey,
-      updatedAt: Date.now()
+  const nextStatus = {
+    ...status,
+    site: 'jable',
+    pageType: pageTypeKey,
+    updatedAt: Date.now()
+  };
+  syncStatusPanel?.render(nextStatus);
+
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) {
+      console.warn('[jable] 无法写入同步状态：storage API 不可用');
+      return;
     }
-  });
+    const pending = chrome.storage.local.set({ lastSyncStatus: nextStatus });
+    if (pending && typeof pending.catch === 'function') {
+      pending.catch((error) => console.warn('[jable] 写入同步状态失败:', error));
+    }
+  } catch (error) {
+    console.warn('[jable] 写入同步状态失败:', error);
+  }
 }
 
 // 开始执行
@@ -257,11 +279,32 @@ function createFetchButton() {
   const profileNav = document.querySelector('.profile-nav');
   if (profileNav) {
     const container = document.createElement('div');
-    container.style.cssText = 'display: inline-flex; align-items: center; margin-left: 12px;';
+    container.style.cssText = 'display:inline-flex;flex-direction:column;align-items:flex-start;margin-left:12px;vertical-align:top;';
     container.appendChild(button);
+    if (globalThis.SyncStatusUI) {
+      syncStatusPanel = globalThis.SyncStatusUI.createPanel({
+        site: 'jable',
+        pageType: pageTypeKey,
+        siteLabel: 'Jable',
+        sourceLabel: pageType,
+        container
+      });
+    }
     profileNav.appendChild(container);
   } else {
-    document.body.appendChild(button);
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;display:flex;flex-direction:column;align-items:flex-end;';
+    container.appendChild(button);
+    if (globalThis.SyncStatusUI) {
+      syncStatusPanel = globalThis.SyncStatusUI.createPanel({
+        site: 'jable',
+        pageType: pageTypeKey,
+        siteLabel: 'Jable',
+        sourceLabel: pageType,
+        container
+      });
+    }
+    document.body.appendChild(container);
   }
 
   return button;
@@ -276,8 +319,10 @@ async function handleFetchClick() {
   button.style.background = 'linear-gradient(135deg, #6c757d 0%, #495057 100%)';
   button.style.boxShadow = 'none';
 
+  activeSyncStartedAt = Date.now();
   setSyncStatus({
     state: 'running',
+    startedAt: activeSyncStartedAt,
     message: `正在同步${pageType}`
   });
 
@@ -287,6 +332,8 @@ async function handleFetchClick() {
     setSyncStatus({
       state: 'success',
       count: savedCount,
+      startedAt: activeSyncStartedAt,
+      completedAt: Date.now(),
       message: `成功同步 ${savedCount} 条${pageType}`
     });
 
@@ -308,6 +355,8 @@ async function handleFetchClick() {
 
     setSyncStatus({
       state: 'error',
+      startedAt: activeSyncStartedAt,
+      completedAt: Date.now(),
       message: error.message || `同步${pageType}失败`
     });
 
@@ -322,6 +371,7 @@ async function handleFetchClick() {
       button.style.boxShadow = '0 2px 8px rgba(220, 47, 2, 0.35)';
     }, 3000);
   }
+  activeSyncStartedAt = null;
 }
 
 // 主要的获取数据函数
@@ -341,6 +391,12 @@ async function fetchAllFavoriteVideos() {
 
       const button = document.getElementById('fetch-fav-videos-btn');
       button.textContent = `获取中... (${i}/${totalPage})`;
+      setSyncStatus({
+        state: 'running',
+        startedAt: activeSyncStartedAt,
+        progress: { page: i, total: totalPage },
+        message: `正在同步 Jable ${pageType}，第 ${i}/${totalPage} 页`
+      });
 
       await fetchFunc(i);
       console.log(`✅ 第 ${i} 页${pageType}数据获取成功`);
