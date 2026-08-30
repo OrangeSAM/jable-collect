@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Jable Collect 把 Jable 与 MissAV 收藏同步到浏览器本地，统一搜索、筛选、排序和备份。">
+  <meta name="theme-color" content="#111318">
+  <title>Jable Collect — 把分散的收藏，收回一个地方</title>
+  <link rel="icon" href="../images/icon128.png">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Jable Collect 首页">
+      <span class="brand-mark" aria-hidden="true">JC</span>
+      <span class="brand-name">Jable Collect</span>
+      <span class="brand-tag">BETA</span>
+    </a>
+    <nav class="nav-links" aria-label="主导航">
+      <a href="#how">怎么用</a>
+      <a href="#privacy">数据与安全</a>
+      <a href="#faq">常见问题</a>
+    </nav>
+    <a class="header-cta" href="https://github.com/OrangeSAM/jable-collect/releases/latest" target="_blank" rel="noreferrer">
+      获取 Beta <span aria-hidden="true">↗</span>
+    </a>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy reveal">
+        <p class="eyebrow"><span class="pulse-dot"></span> Jable + MissAV 收藏管理工具</p>
+        <h1><span class="hero-line">把分散的收藏，</span><span class="hero-line hero-line-accent">收回一个地方。</span></h1>
+        <p class="hero-lede">
+          一键同步两个站点的收藏，放进你自己的浏览器资料库。
+          搜索、筛选、排序、备份，不再让收藏只停在“收藏过”。
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://github.com/OrangeSAM/jable-collect/releases/latest" target="_blank" rel="noreferrer">
+            下载 Chrome 扩展 <span aria-hidden="true">↓</span>
+          </a>
+          <a class="button button-ghost" href="#how">查看安装方法</a>
+        </div>
+        <div class="hero-trust" aria-label="产品特性">
+          <span>✓ 本地存储</span>
+          <span>✓ 官网为准</span>
+          <span>✓ 支持导出</span>
+        </div>
+      </div>
+
+      <div class="hero-visual reveal" aria-label="Jable 与 MissAV 收藏汇入本地资料库的示意图">
+        <div class="visual-label">LOCAL COLLECTION LEDGER</div>
+        <div class="source source-jable">
+          <span class="source-id">01</span>
+          <span class="source-name">JABLE</span>
+          <span class="source-state">CONNECTED</span>
+        </div>
+        <div class="source source-missav">
+          <span class="source-id">02</span>
+          <span class="source-name">MISSAV</span>
+          <span class="source-state">CONNECTED</span>
+        </div>
+        <div class="rail rail-one"><i></i></div>
+        <div class="rail rail-two"><i></i></div>
+        <div class="ledger-card">
+          <div class="ledger-head">
+            <span>YOUR ARCHIVE</span>
+            <span class="live-mark"><i></i> LOCAL</span>
+          </div>
+          <div class="ledger-number">4,097</div>
+          <div class="ledger-caption">条收藏，可搜索、可整理、可带走</div>
+          <div class="ledger-bars" aria-hidden="true">
+            <span style="--size: 74%"></span>
+            <span style="--size: 46%"></span>
+            <span style="--size: 88%"></span>
+            <span style="--size: 62%"></span>
+            <span style="--size: 95%"></span>
+            <span style="--size: 54%"></span>
+            <span style="--size: 81%"></span>
+          </div>
+          <div class="sync-receipt">
+            <span class="receipt-icon">✓</span>
+            <span><b>同步完成</b><small>结果已保留 · 22:18</small></span>
+          </div>
+        </div>
+        <div class="visual-foot">
+          <span>INDEXEDDB</span>
+          <span>NO CLOUD REQUIRED</span>
+          <span>MV3</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="proof-strip" aria-label="核心能力">
+      <p>不是又一个“稍后再看”列表。</p>
+      <div>
+        <span>双站点</span>
+        <span>双向收藏</span>
+        <span>全量校验</span>
+        <span>本地检索</span>
+      </div>
+    </section>
+
+    <section class="section problem-section">
+      <div class="section-intro reveal">
+        <p class="section-index">01 / WHY</p>
+        <h2>你缺的不是更多收藏，<br>是让收藏重新变得有用。</h2>
+      </div>
+      <div class="problem-grid">
+        <article class="problem-card reveal">
+          <span class="card-no">A</span>
+          <h3>分散</h3>
+          <p>Jable 和 MissAV 各收各的，想找一部片时需要在两个站点反复翻。</p>
+        </article>
+        <article class="problem-card reveal">
+          <span class="card-no">B</span>
+          <h3>沉底</h3>
+          <p>收藏越多，早期内容越难找。缺少跨站搜索、筛选和稳定排序。</p>
+        </article>
+        <article class="problem-card reveal">
+          <span class="card-no">C</span>
+          <h3>不可带走</h3>
+          <p>数据锁在站点账号里。没有一份属于自己、可导出和恢复的收藏档案。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section product-section" id="product">
+      <div class="product-shot reveal">
+        <div class="window-bar">
+          <span></span><span></span><span></span>
+          <b>JABLE COLLECT / LOCAL ARCHIVE</b>
+        </div>
+        <img src="../images/jable-collect.png" alt="Jable Collect 收藏管理页，演示站点切换、搜索、排序和分页" width="1680" height="1283" loading="lazy">
+      </div>
+      <div class="product-copy reveal">
+        <p class="section-index">02 / PRODUCT</p>
+        <h2>官网负责收藏，<br>它负责让你找得到。</h2>
+        <div class="feature-list">
+          <article>
+            <span>01</span>
+            <div><h3>双向收藏闭环</h3><p>在官网收藏或取消，本地跟着更新；从管理页取消，也会回写官网。</p></div>
+          </article>
+          <article>
+            <span>02</span>
+            <div><h3>安全全量同步</h3><p>长时间同步有分页进度、双轮校验和持久结果；失败时保留旧数据。</p></div>
+          </article>
+          <article>
+            <span>03</span>
+            <div><h3>一个本地资料库</h3><p>按番号或标题搜索，按来源筛选、按原始顺序浏览，并随时导出 JSON 备份。</p></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section how-section" id="how">
+      <div class="section-intro reveal">
+        <p class="section-index">03 / START</p>
+        <h2>三步，建立你的收藏档案。</h2>
+      </div>
+      <ol class="steps">
+        <li class="reveal">
+          <span class="step-number">01</span>
+          <div><h3>安装扩展</h3><p>下载并解压最新 Beta，在 <code>chrome://extensions</code> 开启开发者模式，加载已解压的扩展。</p></div>
+        </li>
+        <li class="reveal">
+          <span class="step-number">02</span>
+          <div><h3>打开收藏页</h3><p>登录 Jable 或 MissAV，进入对应的收藏页。扩展会自动识别当前站点。</p></div>
+        </li>
+        <li class="reveal">
+          <span class="step-number">03</span>
+          <div><h3>同步并整理</h3><p>点击“同步当前页面”。完成后打开管理页，搜索、排序、筛选或备份。</p></div>
+        </li>
+      </ol>
+      <div class="install-cta reveal">
+        <div>
+          <span class="install-kicker">CHROME / EDGE / BRAVE</span>
+          <h3>现在就把第一批收藏收回来。</h3>
+        </div>
+        <a class="button button-primary" href="https://github.com/OrangeSAM/jable-collect/releases/latest" target="_blank" rel="noreferrer">获取最新 Beta <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="section privacy-section" id="privacy">
+      <div class="privacy-copy reveal">
+        <p class="section-index">04 / OWNERSHIP</p>
+        <h2>你的收藏，<br>应该由你保管。</h2>
+        <p>收藏记录保存在当前浏览器的 IndexedDB 中，不需要 Jable Collect 云端账号。你可以随时导出和恢复。</p>
+      </div>
+      <div class="privacy-ledger reveal" aria-label="数据流向说明">
+        <div class="privacy-row"><span>COLLECTION CONTENT</span><b>LOCAL ONLY</b></div>
+        <div class="privacy-row"><span>CLOUD ACCOUNT</span><b>NOT REQUIRED</b></div>
+        <div class="privacy-row"><span>SOURCE OF TRUTH</span><b>OFFICIAL SITE</b></div>
+        <div class="privacy-row"><span>PORTABILITY</span><b>JSON EXPORT</b></div>
+        <div class="privacy-seal">
+          <span>✓</span>
+          <p><b>LOCAL-FIRST</b><small>数据不被产品锁死</small></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section faq-section" id="faq">
+      <div class="section-intro reveal">
+        <p class="section-index">05 / FAQ</p>
+        <h2>安装前，你可能想问。</h2>
+      </div>
+      <div class="faq-list">
+        <details class="reveal">
+          <summary>它会把 Jable 收藏自动加到 MissAV 吗？<span>+</span></summary>
+          <p>不会。两个站点的收藏独立管理，Jable Collect 做的是把它们汇总到同一个本地管理页，不会擅自跨站点添加收藏。</p>
+        </details>
+        <details class="reveal">
+          <summary>同步过程中我能做别的事吗？<span>+</span></summary>
+          <p>可以切换到其他标签页，但请不要关闭或跳转正在同步的收藏页。完成或失败后，页面状态栏和扩展图标都会给出结果。</p>
+        </details>
+        <details class="reveal">
+          <summary>网络中断会不会误删我的本地收藏？<span>+</span></summary>
+          <p>不会。同步失败时会保留旧数据。MissAV 只有在两轮完整快照一致时，才会用官网结果替换本地收藏。</p>
+        </details>
+        <details class="reveal">
+          <summary>为什么现在需要手动安装？<span>+</span></summary>
+          <p>当前版本仍在 Beta 阶段，通过 GitHub Releases 发布，尚未上架 Chrome Web Store。下载时请认准官方仓库。</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div class="final-grid" aria-hidden="true"></div>
+      <div class="final-copy reveal">
+        <span class="section-index">READY WHEN YOU ARE</span>
+        <h2>下一次想找回它时，<br>别再从 43 页收藏开始。</h2>
+        <p>用一次同步，换回一个真正可用的收藏库。</p>
+        <div class="hero-actions">
+          <a class="button button-light" href="https://github.com/OrangeSAM/jable-collect/releases/latest" target="_blank" rel="noreferrer">下载 Jable Collect <span aria-hidden="true">↗</span></a>
+          <a class="button button-dark" href="https://github.com/OrangeSAM/jable-collect" target="_blank" rel="noreferrer">查看 GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true">JC</span><span class="brand-name">Jable Collect</span></a>
+    <p>本项目与 Jable、MissAV 无隶属或合作关系。请在遵守所在地法律与站点条款的前提下使用。</p>
+    <span>© <span id="year">2026</span> Jable Collect</span>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
