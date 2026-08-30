@@ -125,7 +125,7 @@
 
   function isCurrentIdentityValid() {
     const metadata = getMetadata();
-    return Boolean(metadata.url && metadata.videoId);
+    return Boolean(metadata.url);
   }
 
   async function applyVerifiedState(detail) {
@@ -201,8 +201,11 @@
     if (request.action !== 'setMissavFavoriteOnWebsite') return false;
 
     const currentVideo = getMetadata();
+    const requestedUrl = Shared.normalizeMissavUrl(request.url, window.location.href);
     const requestedVideoId = String(request.videoId || '').toUpperCase();
-    if (!currentVideo.videoId || currentVideo.videoId !== requestedVideoId) {
+    const urlMatches = requestedUrl && currentVideo.url === requestedUrl;
+    const idMatches = requestedVideoId && currentVideo.videoId === requestedVideoId;
+    if (!currentVideo.url || (!urlMatches && !idMatches)) {
       sendResponse({ success: false, error: '当前 MissAV 详情页与目标影片不匹配' });
       return false;
     }

@@ -33,7 +33,7 @@ function parseVideoCard(card) {
   const duration = card.querySelector('span.absolute.bottom-1.right-1, span[class*="bottom-1"][class*="right-1"]');
   const detailHref = Shared.normalizeMissavUrl(titleLink?.getAttribute('href'), window.location.origin);
   const videoId = Shared.extractMissavVideoId(detailHref);
-  if (!detailHref || !videoId) return null;
+  if (!detailHref) return null;
 
   const title = (titleLink?.textContent || img?.alt || '').trim();
   return {
@@ -169,7 +169,7 @@ function validateSnapshot(snapshot) {
   if (!pages.length || pages.length !== totalPage) throw new Error('MissAV 分页快照不完整');
 
   const firstCapacity = pages[0].candidateCount;
-  const seenIds = new Set();
+  const seenUrls = new Set();
   pages.forEach((page, index) => {
     const isLastPage = index === pages.length - 1;
     if (!isLastPage && page.candidateCount !== firstCapacity) {
@@ -177,18 +177,20 @@ function validateSnapshot(snapshot) {
     }
     if (isLastPage && page.candidateCount > firstCapacity) throw new Error('末页卡片数超过稳定页容量');
     page.videos.forEach((video) => {
-      if (seenIds.has(video.videoId)) throw new Error(`分页中出现重复影片：${video.videoId}`);
-      seenIds.add(video.videoId);
+      const normalizedUrl = Shared.normalizeMissavUrl(video.url);
+      if (!normalizedUrl || seenUrls.has(normalizedUrl)) throw new Error(`分页中出现重复影片：${normalizedUrl || '未知链接'}`);
+      seenUrls.add(normalizedUrl);
     });
   });
 
   const displayedTotals = pages.map((page) => page.displayedTotal).filter(Number.isInteger);
-  if (displayedTotals.length && displayedTotals.some((total) => total !== seenIds.size)) {
+  if (displayedTotals.length && displayedTotals.some((total) => total !== seenUrls.size)) {
     throw new Error('官网显示的收藏总数与解析结果不一致');
   }
 
   snapshot.videos = pages.flatMap((page) => page.videos);
-  snapshot.videoIds = snapshot.videos.map((video) => video.videoId).sort();
+  snapshot.videoUrls = snapshot.videos.map((video) => Shared.normalizeMissavUrl(video.url)).sort();
+  snapshot.videoIds = snapshot.videos.map((video) => video.videoId).filter(Boolean).sort();
   snapshot.pageCounts = pages.map((page) => page.candidateCount);
   return snapshot;
 }
@@ -217,7 +219,7 @@ function snapshotsMatch(first, second) {
   return first.totalPage === second.totalPage
     && first.pageCounts.length === second.pageCounts.length
     && first.pageCounts.every((count, index) => count === second.pageCounts[index])
-    && Shared.sameStringSet(first.videoIds, second.videoIds);
+    && Shared.sameStringSet(first.videoUrls, second.videoUrls);
 }
 
 function sendToBackground(action, data = {}) {

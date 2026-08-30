@@ -64,7 +64,7 @@ function getStoreName(site = DEFAULT_SITE) {
 function prepareMissavVideo(video = {}) {
   const url = Missav.normalizeMissavUrl(video.url || video.detailHref);
   const videoId = String(video.videoId || Missav.extractMissavVideoId(url) || '').toUpperCase() || null;
-  if (!url || !videoId) return null;
+  if (!url) return null;
 
   return {
     ...video,
@@ -332,7 +332,7 @@ async function saveMissavVideos(database, videos) {
   const incomingMap = new Map();
   videos.forEach((video) => {
     const prepared = prepareMissavVideo(video);
-    if (prepared) incomingMap.set(prepared.videoId, prepared);
+    if (prepared) incomingMap.set(prepared.url, prepared);
   });
   if (!incomingMap.size) return 0;
 
@@ -345,31 +345,18 @@ async function saveMissavVideos(database, videos) {
     getAllRequest.onsuccess = () => {
       const existing = getAllRequest.result || [];
       let newRecordCount = 0;
-      incomingMap.forEach((incoming, videoId) => {
-        const hasIdentityMatch = existing.some((video) => {
-          const existingId = String(video.videoId || Missav.extractMissavVideoId(video.url) || '').toUpperCase();
-          return existingId === videoId;
-        });
+      incomingMap.forEach((incoming) => {
         const hasUrlMatch = existing.some((record) => Missav.normalizeMissavUrl(record.url) === incoming.url);
-        if (!hasIdentityMatch && !hasUrlMatch) newRecordCount++;
+        if (!hasUrlMatch) newRecordCount++;
       });
       let nextFrontOrder = Missav.getFrontOrderStart(
         existing.map((video) => video.order),
         newRecordCount
       );
 
-      incomingMap.forEach((incoming, videoId) => {
-        const previousRecords = existing.filter((video) => {
-          const existingId = String(video.videoId || Missav.extractMissavVideoId(video.url) || '').toUpperCase();
-          return existingId === videoId;
-        });
+      incomingMap.forEach((incoming) => {
         const sameUrl = existing.find((record) => Missav.normalizeMissavUrl(record.url) === incoming.url) || null;
-        const previous = previousRecords[0] || sameUrl;
-
-        previousRecords.forEach((record) => store.delete(record.url));
-        if (!previousRecords.some((record) => record.url === incoming.url)) {
-          if (sameUrl) store.delete(sameUrl.url);
-        }
+        const previous = sameUrl;
 
         const merged = {
           ...(previous || {}),
@@ -399,8 +386,8 @@ async function replaceMissavFavorites(videos) {
   const incomingMap = new Map();
   videos.forEach((video, index) => {
     const prepared = prepareMissavVideo(video);
-    if (!prepared || incomingMap.has(prepared.videoId)) return;
-    incomingMap.set(prepared.videoId, { ...prepared, order: index + 1, updatedAt: Date.now() });
+    if (!prepared || incomingMap.has(prepared.url)) return;
+    incomingMap.set(prepared.url, { ...prepared, order: index + 1, updatedAt: Date.now() });
   });
 
   if (incomingMap.size !== videos.length) {
@@ -443,7 +430,7 @@ async function deleteMissavVideoByIdentity(videoId, url) {
       (getAllRequest.result || []).forEach((record) => {
         const recordId = String(record.videoId || Missav.extractMissavVideoId(record.url) || '').toUpperCase();
         const recordUrl = Missav.normalizeMissavUrl(record.url);
-        if ((normalizedVideoId && recordId === normalizedVideoId) || (normalizedUrl && recordUrl === normalizedUrl)) {
+        if ((normalizedUrl && recordUrl === normalizedUrl) || (!normalizedUrl && normalizedVideoId && recordId === normalizedVideoId)) {
           store.delete(record.url);
           deletedCount++;
         }
@@ -809,15 +796,15 @@ function updateMissavPending(requestId, record) {
   return missavPendingWriteQueue;
 }
 
-function isMissavDetailTab(tab, videoId) {
+function isMissavDetailTab(tab, normalizedUrl) {
   if (!tab?.id || !tab.url || !Missav.isMissavDetailUrl(tab.url)) return false;
-  return Missav.extractMissavVideoId(tab.url) === videoId;
+  return Missav.normalizeMissavUrl(tab.url) === normalizedUrl;
 }
 
 async function findOrCreateMissavDetailTab(url) {
   const normalizedUrl = Missav.normalizeMissavUrl(url);
   const videoId = Missav.extractMissavVideoId(normalizedUrl);
-  if (!normalizedUrl || !videoId) throw new Error('无效的 MissAV 影片链接');
+  if (!normalizedUrl) throw new Error('无效的 MissAV 影片链接');
 
   const existingTabs = await queryTabs({
     url: [
@@ -826,7 +813,7 @@ async function findOrCreateMissavDetailTab(url) {
       'https://missav.live/*'
     ]
   });
-  const matchedTab = existingTabs.find((tab) => isMissavDetailTab(tab, videoId));
+  const matchedTab = existingTabs.find((tab) => isMissavDetailTab(tab, normalizedUrl));
   if (matchedTab) return { tab: matchedTab, created: false, normalizedUrl, videoId };
 
   const tab = await createTab({ url: normalizedUrl, active: false });
@@ -864,6 +851,7 @@ async function setMissavFavoriteRemotely(url, desiredSaved) {
     const response = await sendMessageToTabWithRetry(tab.id, {
       action: 'setMissavFavoriteOnWebsite',
       desiredSaved: Boolean(desiredSaved),
+      url: normalizedUrl,
       videoId
     }, 20000);
     if (!response?.success) {
@@ -880,9 +868,9 @@ async function setMissavFavoriteRemotely(url, desiredSaved) {
 
 async function applyMissavVerifiedState(request, sender) {
   const senderUrl = sender?.tab?.url;
-  const senderVideoId = Missav.extractMissavVideoId(senderUrl);
   const video = prepareMissavVideo(request.video || {});
-  if (!senderUrl || !senderVideoId || !video || senderVideoId !== video.videoId) {
+  const normalizedSenderUrl = Missav.normalizeMissavUrl(senderUrl);
+  if (!normalizedSenderUrl || !video || normalizedSenderUrl !== video.url) {
     throw new Error('MissAV 页面身份校验失败');
   }
   if (!Missav.isVerifiedMissavState(request.state)) {
@@ -926,12 +914,13 @@ async function recoverMissavPendingOperations() {
         }
 
         if (Date.now() <= operation.deadline) {
-          const videoId = Missav.extractMissavVideoId(tab.url);
-          if (videoId) {
+          const normalizedUrl = Missav.normalizeMissavUrl(tab.url);
+          if (normalizedUrl) {
             const response = await sendMessageToTabWithRetry(tab.id, {
               action: 'setMissavFavoriteOnWebsite',
               desiredSaved: Boolean(operation.desiredSaved),
-              videoId
+              url: normalizedUrl,
+              videoId: Missav.extractMissavVideoId(normalizedUrl)
             }, 5000);
             if (response?.success) await updateMissavPending(requestId, null);
           }

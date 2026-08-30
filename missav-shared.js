@@ -1,6 +1,7 @@
 (function initMissavShared(root) {
   const ALLOWED_HOSTS = new Set(['missav.ws', 'missav.ai', 'missav.live']);
   const DETAIL_VIDEO_ID_PATTERN = /^((?:[a-z0-9]+(?:[-_][a-z0-9]+)*[-_][a-z0-9]*\d)|(?:[a-z]+\d+))(?:-[a-z]+(?:-[a-z]+)*)?$/i;
+  const NON_DETAIL_PATH_SEGMENTS = new Set(['saved', 'api', 'actresses']);
 
   function isAllowedMissavHost(hostname) {
     return ALLOWED_HOSTS.has(String(hostname || '').toLowerCase());
@@ -22,20 +23,28 @@
     }
   }
 
-  function extractMissavVideoId(input, base) {
+  function extractMissavSlug(input, base) {
     const normalizedUrl = normalizeMissavUrl(input, base);
     if (!normalizedUrl) return null;
 
     try {
       const segments = new URL(normalizedUrl).pathname.split('/').filter(Boolean);
+      if (segments.some((segment) => NON_DETAIL_PATH_SEGMENTS.has(segment.toLowerCase()))) return null;
       const candidate = decodeURIComponent(segments[segments.length - 1] || '');
-      const match = candidate.match(DETAIL_VIDEO_ID_PATTERN);
-      const videoId = match?.[1] || '';
-      if (!videoId || (!/[a-z]/i.test(videoId) && !/[-_]/.test(videoId))) return null;
-      return videoId.toUpperCase();
+      return candidate && !/[/?#\s]/.test(candidate) ? candidate : null;
     } catch (error) {
       return null;
     }
+  }
+
+  function extractMissavVideoId(input, base) {
+    const candidate = extractMissavSlug(input, base);
+    if (!candidate || !/\d/.test(candidate) || (!/[a-z]/i.test(candidate) && !/[-_]/.test(candidate))) {
+      return null;
+    }
+
+    const match = candidate.match(DETAIL_VIDEO_ID_PATTERN);
+    return (match?.[1] || candidate).toUpperCase();
   }
 
   function isMissavDetailUrl(input, base) {
@@ -101,8 +110,10 @@
   const api = {
     ALLOWED_HOSTS,
     DETAIL_VIDEO_ID_PATTERN,
+    NON_DETAIL_PATH_SEGMENTS,
     isAllowedMissavHost,
     normalizeMissavUrl,
+    extractMissavSlug,
     extractMissavVideoId,
     isMissavDetailUrl,
     parseMissavEndpoints,
