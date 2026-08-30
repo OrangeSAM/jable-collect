@@ -34,6 +34,7 @@ test('extracts only detail-page style video IDs', () => {
     'MIMK-284'
   );
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/dm18/570-rin-k01'), '570-RIN-K01');
+  assert.equal(Shared.extractMissavVideoId('https://missav.ws/dm13/hmdn-460-2'), 'HMDN-460-2');
   assert.equal(Shared.isMissavDetailUrl('https://missav.ws/cn/siro-5720-uncensored-leak'), true);
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/cn/saved'), null);
   assert.equal(Shared.extractMissavVideoId('https://missav.ws/api/actresses/1016525'), null);
