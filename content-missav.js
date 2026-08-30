@@ -130,11 +130,20 @@ function parseMissavSavedPage(html, responseUrl, expectedPage) {
 }
 
 async function fetchSavedPage(page, attempt = 1) {
-  const response = await fetch(getCurrentSavedUrl(page), {
-    method: 'GET',
-    credentials: 'include',
-    cache: 'no-store'
-  });
+  let response;
+  try {
+    response = await fetch(getCurrentSavedUrl(page), {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    });
+  } catch (error) {
+    if (attempt < MAX_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, 800 * (2 ** (attempt - 1))));
+      return fetchSavedPage(page, attempt + 1);
+    }
+    throw new Error(`请求第 ${page} 页失败：${error.message || '网络连接中断'}`, { cause: error });
+  }
 
   if ((response.status === 429 || response.status >= 500) && attempt < MAX_RETRIES) {
     await new Promise((resolve) => setTimeout(resolve, 800 * (2 ** (attempt - 1))));
@@ -142,7 +151,16 @@ async function fetchSavedPage(page, attempt = 1) {
   }
   if (!response.ok) throw new Error(`请求第 ${page} 页失败：${response.status}`);
 
-  const html = await response.text();
+  let html;
+  try {
+    html = await response.text();
+  } catch (error) {
+    if (attempt < MAX_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, 800 * (2 ** (attempt - 1))));
+      return fetchSavedPage(page, attempt + 1);
+    }
+    throw new Error(`请求第 ${page} 页失败：${error.message || '响应读取中断'}`, { cause: error });
+  }
   return parseMissavSavedPage(html, response.url, page);
 }
 
@@ -213,9 +231,20 @@ function sendToBackground(action, data = {}) {
 }
 
 function setSyncStatus(status) {
-  chrome.storage.local.set({
-    lastSyncStatus: { ...status, site: MISSAV_SITE, pageType: PAGE_TYPE, updatedAt: Date.now() }
-  });
+  try {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local?.set) {
+      console.warn('[missav] 无法写入同步状态：storage API 不可用');
+      return;
+    }
+    const pending = chrome.storage.local.set({
+      lastSyncStatus: { ...status, site: MISSAV_SITE, pageType: PAGE_TYPE, updatedAt: Date.now() }
+    });
+    if (pending && typeof pending.catch === 'function') {
+      pending.catch((error) => console.warn('[missav] 写入同步状态失败:', error));
+    }
+  } catch (error) {
+    console.warn('[missav] 写入同步状态失败:', error);
+  }
 }
 
 function createFetchButton() {
